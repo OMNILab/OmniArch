@@ -1,6 +1,6 @@
 """
 Enhanced Data Manager Module
-Loads mock data from CSV files for the smart meeting system
+Loads mock data from CSV files with session state integration for the smart meeting system
 """
 
 import pandas as pd
@@ -8,20 +8,27 @@ import os
 from datetime import datetime, timedelta
 from faker import Faker
 import random
+import streamlit as st
 
 class DataManager:
-    """Enhanced data manager that loads data from CSV files"""
+    """Enhanced data manager that loads data from CSV files and manages session state"""
     
     def __init__(self, use_csv=True):
         self.fake = Faker('zh_CN')
         self.use_csv = use_csv
-        self.mock_data = {}
         self.csv_path = "streamlit/mock"
-        
-        if use_csv and self._csv_files_exist():
-            self._load_from_csv()
-        else:
-            self._generate_mock_data()
+        self._init_session_state()
+    
+    def _init_session_state(self):
+        """Initialize session state with mock data if not already present"""
+        if 'mock_data' not in st.session_state:
+            st.session_state.mock_data = {}
+            
+            # Try to load from CSV first, fall back to generated data
+            if self.use_csv and self._csv_files_exist():
+                self._load_from_csv()
+            else:
+                self._generate_mock_data()
     
     def _csv_files_exist(self):
         """Check if CSV files exist"""
@@ -38,23 +45,23 @@ class DataManager:
         return True
     
     def _load_from_csv(self):
-        """Load data from CSV files"""
+        """Load data from CSV files into session state"""
         try:
             # Load buildings data
             buildings_df = pd.read_csv(os.path.join(self.csv_path, 'buildings.csv'))
-            self.mock_data['buildings'] = buildings_df.to_dict('records')
+            st.session_state.mock_data['buildings'] = buildings_df.to_dict('records')
             
             # Load meeting rooms data
             rooms_df = pd.read_csv(os.path.join(self.csv_path, 'meeting_rooms.csv'))
-            self.mock_data['rooms'] = rooms_df.to_dict('records')
+            st.session_state.mock_data['rooms'] = rooms_df.to_dict('records')
             
             # Load departments data
             departments_df = pd.read_csv(os.path.join(self.csv_path, 'departments.csv'))
-            self.mock_data['departments'] = departments_df.to_dict('records')
+            st.session_state.mock_data['departments'] = departments_df.to_dict('records')
             
             # Load users data
             users_df = pd.read_csv(os.path.join(self.csv_path, 'users.csv'))
-            self.mock_data['users'] = users_df.to_dict('records')
+            st.session_state.mock_data['users'] = users_df.to_dict('records')
             
             # Load bookings data
             bookings_df = pd.read_csv(os.path.join(self.csv_path, 'bookings.csv'))
@@ -62,32 +69,32 @@ class DataManager:
             bookings_df['start_datetime'] = pd.to_datetime(bookings_df['start_datetime'])
             bookings_df['end_datetime'] = pd.to_datetime(bookings_df['end_datetime'])
             bookings_df['created_datetime'] = pd.to_datetime(bookings_df['created_datetime'])
-            self.mock_data['meetings'] = bookings_df.to_dict('records')
+            st.session_state.mock_data['meetings'] = bookings_df.to_dict('records')
             
             # Load meeting minutes data
             minutes_df = pd.read_csv(os.path.join(self.csv_path, 'meeting_minutes.csv'))
             minutes_df['created_datetime'] = pd.to_datetime(minutes_df['created_datetime'])
             minutes_df['updated_datetime'] = pd.to_datetime(minutes_df['updated_datetime'])
-            self.mock_data['minutes'] = minutes_df.to_dict('records')
+            st.session_state.mock_data['minutes'] = minutes_df.to_dict('records')
             
             # Load tasks data
             tasks_df = pd.read_csv(os.path.join(self.csv_path, 'tasks.csv'))
             tasks_df['deadline'] = pd.to_datetime(tasks_df['deadline'])
             tasks_df['created_datetime'] = pd.to_datetime(tasks_df['created_datetime'])
             tasks_df['updated_datetime'] = pd.to_datetime(tasks_df['updated_datetime'])
-            self.mock_data['tasks'] = tasks_df.to_dict('records')
+            st.session_state.mock_data['tasks'] = tasks_df.to_dict('records')
             
             # Load booking statistics data
             statistics_df = pd.read_csv(os.path.join(self.csv_path, 'booking_statistics.csv'))
             statistics_df['created_date'] = pd.to_datetime(statistics_df['created_date'])
-            self.mock_data['statistics'] = statistics_df.to_dict('records')
+            st.session_state.mock_data['statistics'] = statistics_df.to_dict('records')
             
             # Load user requirements data
             requirements_df = pd.read_csv(os.path.join(self.csv_path, 'user_requirements.csv'))
             requirements_df['created_datetime'] = pd.to_datetime(requirements_df['created_datetime'])
             # Handle nullable datetime columns
             requirements_df['parsed_datetime'] = pd.to_datetime(requirements_df['parsed_datetime'], errors='coerce')
-            self.mock_data['requirements'] = requirements_df.to_dict('records')
+            st.session_state.mock_data['requirements'] = requirements_df.to_dict('records')
             
         except Exception as e:
             print(f"Error loading CSV files: {e}")
@@ -121,7 +128,7 @@ class DataManager:
             }
             users.append(user)
         
-        self.mock_data['users'] = users
+        st.session_state.mock_data['users'] = users
     
     def _generate_rooms(self):
         """Generate mock room data"""
@@ -144,7 +151,7 @@ class DataManager:
             }
             rooms.append(room)
         
-        self.mock_data['rooms'] = rooms
+        st.session_state.mock_data['rooms'] = rooms
     
     def _generate_meetings(self):
         """Generate mock meeting data"""
@@ -177,7 +184,7 @@ class DataManager:
             }
             meetings.append(meeting)
         
-        self.mock_data['meetings'] = meetings
+        st.session_state.mock_data['meetings'] = meetings
     
     def _generate_tasks(self):
         """Generate mock task data"""
@@ -202,7 +209,7 @@ class DataManager:
             }
             tasks.append(task)
         
-        self.mock_data['tasks'] = tasks
+        st.session_state.mock_data['tasks'] = tasks
     
     def _generate_minutes(self):
         """Generate mock meeting minutes data"""
@@ -226,16 +233,16 @@ class DataManager:
             }
             minutes.append(minute)
         
-        self.mock_data['minutes'] = minutes
+        st.session_state.mock_data['minutes'] = minutes
     
     def get_data(self):
-        """Get all mock data"""
-        return self.mock_data
+        """Get all mock data from session state"""
+        return st.session_state.mock_data
     
     def get_dataframe(self, data_type):
-        """Get specific data as pandas DataFrame"""
-        if data_type in self.mock_data:
-            df = pd.DataFrame(self.mock_data[data_type])
+        """Get specific data as pandas DataFrame from session state with CSV compatibility"""
+        if data_type in st.session_state.mock_data:
+            df = pd.DataFrame(st.session_state.mock_data[data_type])
             
             # Convert datetime columns for consistency
             if data_type == 'meetings':
@@ -319,23 +326,98 @@ class DataManager:
         return pd.DataFrame()
     
     def add_meeting(self, meeting_data):
-        """Add a new meeting to the data"""
-        meeting_data['id'] = len(self.mock_data['meetings']) + 1
+        """Add a new meeting to session state"""
+        meeting_data['id'] = len(st.session_state.mock_data['meetings']) + 1
         meeting_data['booking_id'] = meeting_data['id']
-        self.mock_data['meetings'].append(meeting_data)
+        meeting_data['created_at'] = datetime.now()
+        st.session_state.mock_data['meetings'].append(meeting_data)
     
     def add_task(self, task_data):
-        """Add a new task to the data"""
-        task_data['id'] = len(self.mock_data['tasks']) + 1
+        """Add a new task to session state"""
+        task_data['id'] = len(st.session_state.mock_data['tasks']) + 1
         task_data['task_id'] = task_data['id']
-        self.mock_data['tasks'].append(task_data)
+        task_data['created_at'] = datetime.now()
+        st.session_state.mock_data['tasks'].append(task_data)
+    
+    def add_minute(self, minute_data):
+        """Add a new minute to session state"""
+        minute_data['id'] = len(st.session_state.mock_data['minutes']) + 1
+        minute_data['created_at'] = datetime.now()
+        minute_data['updated_at'] = datetime.now()
+        st.session_state.mock_data['minutes'].append(minute_data)
     
     def update_task_status(self, task_id, new_status):
-        """Update task status"""
-        for task in self.mock_data['tasks']:
+        """Update task status in session state"""
+        for task in st.session_state.mock_data['tasks']:
             if task.get('id') == task_id or task.get('task_id') == task_id:
                 task['status'] = new_status
+                task['updated_at'] = datetime.now()
                 break
+    
+    def update_meeting_status(self, meeting_id, new_status):
+        """Update meeting status in session state"""
+        for meeting in st.session_state.mock_data['meetings']:
+            if meeting['id'] == meeting_id:
+                meeting['status'] = new_status
+                meeting['updated_at'] = datetime.now()
+                break
+    
+    def update_minute_status(self, minute_id, new_status):
+        """Update minute status in session state"""
+        for minute in st.session_state.mock_data['minutes']:
+            if minute['id'] == minute_id:
+                minute['status'] = new_status
+                minute['updated_at'] = datetime.now()
+                break
+    
+    def get_meeting_by_id(self, meeting_id):
+        """Get meeting by ID from session state"""
+        for meeting in st.session_state.mock_data['meetings']:
+            if meeting['id'] == meeting_id:
+                return meeting
+        return None
+    
+    def get_task_by_id(self, task_id):
+        """Get task by ID from session state"""
+        for task in st.session_state.mock_data['tasks']:
+            if task['id'] == task_id:
+                return task
+        return None
+    
+    def get_minute_by_id(self, minute_id):
+        """Get minute by ID from session state"""
+        for minute in st.session_state.mock_data['minutes']:
+            if minute['id'] == minute_id:
+                return minute
+        return None
+    
+    def reset_to_default(self):
+        """Reset all data to default mock state"""
+        st.session_state.mock_data = {}
+        # Try to load from CSV first, fall back to generated data
+        if self.use_csv and self._csv_files_exist():
+            self._load_from_csv()
+        else:
+            self._generate_mock_data()
+        st.success("数据已重置为默认状态")
+    
+    def get_dashboard_data(self):
+        """Get aggregated data for dashboard"""
+        meetings_df = self.get_dataframe('meetings')
+        tasks_df = self.get_dataframe('tasks')
+        rooms_df = self.get_dataframe('rooms')
+        users_df = self.get_dataframe('users')
+        
+        return {
+            'total_meetings': len(meetings_df),
+            'total_tasks': len(tasks_df),
+            'total_rooms': len(rooms_df),
+            'total_users': len(users_df),
+            'meetings_today': len(meetings_df[pd.to_datetime(meetings_df['start_time']).dt.date == datetime.now().date()]) if len(meetings_df) > 0 else 0,
+            'completed_tasks': len(tasks_df[tasks_df['status'] == '完成']),
+            'available_rooms': len(rooms_df[rooms_df['status'] == '可用']),
+            'avg_meeting_duration': meetings_df['duration'].mean() if len(meetings_df) > 0 else 0
+        }
     
     def get_room_recommendations(self, capacity, equipment_needed=None, location_preference=None):
         """Get room recommendations based on requirements"""
@@ -350,26 +432,26 @@ class DataManager:
         # Filter by equipment if specified
         if equipment_needed:
             if '投影仪' in equipment_needed:
-                suitable_rooms = suitable_rooms[suitable_rooms['has_projector'] == 1]
+                suitable_rooms = suitable_rooms[suitable_rooms.get('has_projector', 0) == 1]
             if '视频会议设备' in equipment_needed:
-                suitable_rooms = suitable_rooms[suitable_rooms['has_phone'] == 1]
+                suitable_rooms = suitable_rooms[suitable_rooms.get('has_phone', 0) == 1]
             if '白板' in equipment_needed:
-                suitable_rooms = suitable_rooms[suitable_rooms['has_whiteboard'] == 1]
+                suitable_rooms = suitable_rooms[suitable_rooms.get('has_whiteboard', 0) == 1]
             if '显示屏' in equipment_needed:
-                suitable_rooms = suitable_rooms[suitable_rooms['has_screen'] == 1]
+                suitable_rooms = suitable_rooms[suitable_rooms.get('has_screen', 0) == 1]
         
         # Filter by location if specified
         if location_preference:
-            suitable_rooms = suitable_rooms[suitable_rooms['building_id'] == location_preference]
+            suitable_rooms = suitable_rooms[suitable_rooms.get('building_id', 0) == location_preference]
         
         return suitable_rooms.to_dict('records')
     
     def get_booking_statistics(self, stat_type=None, period=None):
         """Get booking statistics"""
-        if 'statistics' not in self.mock_data:
+        if 'statistics' not in st.session_state.mock_data:
             return []
             
-        stats = self.mock_data['statistics']
+        stats = st.session_state.mock_data['statistics']
         
         if stat_type:
             stats = [s for s in stats if s['stat_type'] == stat_type]
@@ -381,10 +463,10 @@ class DataManager:
     
     def get_user_requirements(self, user_id=None, status=None):
         """Get user requirements"""
-        if 'requirements' not in self.mock_data:
+        if 'requirements' not in st.session_state.mock_data:
             return []
             
-        requirements = self.mock_data['requirements']
+        requirements = st.session_state.mock_data['requirements']
         
         if user_id:
             requirements = [r for r in requirements if r['user_id'] == user_id]
@@ -392,4 +474,4 @@ class DataManager:
         if status:
             requirements = [r for r in requirements if r['status'] == status]
             
-        return requirements 
+        return requirements
