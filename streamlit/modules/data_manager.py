@@ -1,23 +1,101 @@
 """
-Data Manager Module
-Handles mock data generation and management for the smart meeting system
+Enhanced Data Manager Module
+Loads mock data from CSV files for the smart meeting system
 """
 
 import pandas as pd
+import os
 from datetime import datetime, timedelta
 from faker import Faker
 import random
 
 class DataManager:
-    """Manages mock data generation and storage"""
+    """Enhanced data manager that loads data from CSV files"""
     
-    def __init__(self):
+    def __init__(self, use_csv=True):
         self.fake = Faker('zh_CN')
+        self.use_csv = use_csv
         self.mock_data = {}
-        self._generate_mock_data()
+        self.csv_path = "streamlit/mock"
+        
+        if use_csv and self._csv_files_exist():
+            self._load_from_csv()
+        else:
+            self._generate_mock_data()
+    
+    def _csv_files_exist(self):
+        """Check if CSV files exist"""
+        required_files = [
+            'buildings.csv', 'meeting_rooms.csv', 'departments.csv', 
+            'users.csv', 'bookings.csv', 'meeting_minutes.csv', 
+            'tasks.csv', 'booking_statistics.csv', 'user_requirements.csv'
+        ]
+        
+        for file in required_files:
+            file_path = os.path.join(self.csv_path, file)
+            if not os.path.exists(file_path):
+                return False
+        return True
+    
+    def _load_from_csv(self):
+        """Load data from CSV files"""
+        try:
+            # Load buildings data
+            buildings_df = pd.read_csv(os.path.join(self.csv_path, 'buildings.csv'))
+            self.mock_data['buildings'] = buildings_df.to_dict('records')
+            
+            # Load meeting rooms data
+            rooms_df = pd.read_csv(os.path.join(self.csv_path, 'meeting_rooms.csv'))
+            self.mock_data['rooms'] = rooms_df.to_dict('records')
+            
+            # Load departments data
+            departments_df = pd.read_csv(os.path.join(self.csv_path, 'departments.csv'))
+            self.mock_data['departments'] = departments_df.to_dict('records')
+            
+            # Load users data
+            users_df = pd.read_csv(os.path.join(self.csv_path, 'users.csv'))
+            self.mock_data['users'] = users_df.to_dict('records')
+            
+            # Load bookings data
+            bookings_df = pd.read_csv(os.path.join(self.csv_path, 'bookings.csv'))
+            # Convert datetime columns
+            bookings_df['start_datetime'] = pd.to_datetime(bookings_df['start_datetime'])
+            bookings_df['end_datetime'] = pd.to_datetime(bookings_df['end_datetime'])
+            bookings_df['created_datetime'] = pd.to_datetime(bookings_df['created_datetime'])
+            self.mock_data['meetings'] = bookings_df.to_dict('records')
+            
+            # Load meeting minutes data
+            minutes_df = pd.read_csv(os.path.join(self.csv_path, 'meeting_minutes.csv'))
+            minutes_df['created_datetime'] = pd.to_datetime(minutes_df['created_datetime'])
+            minutes_df['updated_datetime'] = pd.to_datetime(minutes_df['updated_datetime'])
+            self.mock_data['minutes'] = minutes_df.to_dict('records')
+            
+            # Load tasks data
+            tasks_df = pd.read_csv(os.path.join(self.csv_path, 'tasks.csv'))
+            tasks_df['deadline'] = pd.to_datetime(tasks_df['deadline'])
+            tasks_df['created_datetime'] = pd.to_datetime(tasks_df['created_datetime'])
+            tasks_df['updated_datetime'] = pd.to_datetime(tasks_df['updated_datetime'])
+            self.mock_data['tasks'] = tasks_df.to_dict('records')
+            
+            # Load booking statistics data
+            statistics_df = pd.read_csv(os.path.join(self.csv_path, 'booking_statistics.csv'))
+            statistics_df['created_date'] = pd.to_datetime(statistics_df['created_date'])
+            self.mock_data['statistics'] = statistics_df.to_dict('records')
+            
+            # Load user requirements data
+            requirements_df = pd.read_csv(os.path.join(self.csv_path, 'user_requirements.csv'))
+            requirements_df['created_datetime'] = pd.to_datetime(requirements_df['created_datetime'])
+            # Handle nullable datetime columns
+            requirements_df['parsed_datetime'] = pd.to_datetime(requirements_df['parsed_datetime'], errors='coerce')
+            self.mock_data['requirements'] = requirements_df.to_dict('records')
+            
+        except Exception as e:
+            print(f"Error loading CSV files: {e}")
+            print("Falling back to generated mock data...")
+            self._generate_mock_data()
     
     def _generate_mock_data(self):
-        """Generate comprehensive mock data for the application"""
+        """Generate mock data (fallback method)"""
         self._generate_users()
         self._generate_rooms()
         self._generate_meetings()
@@ -33,6 +111,7 @@ class DataManager:
         for i in range(20):
             user = {
                 'id': i + 1,
+                'user_id': i + 1,
                 'username': self.fake.user_name(),
                 'name': self.fake.name(),
                 'email': self.fake.email(),
@@ -53,9 +132,12 @@ class DataManager:
         for i in range(8):
             room = {
                 'id': i + 1,
+                'room_id': i + 1,
                 'name': f"{random.choice(floors)}{chr(65 + i)}会议室",
+                'room_name': f"{random.choice(floors)}{chr(65 + i)}会议室",
                 'capacity': random.choice([6, 8, 12, 15, 20, 25, 30, 40]),
                 'type': random.choice(room_types),
+                'room_type': random.choice(room_types),
                 'equipment': random.choice(['投影仪', '视频会议设备', '白板', '音响设备']),
                 'floor': random.choice(floors),
                 'status': random.choice(['可用', '维护中', '已预订'])
@@ -75,14 +157,21 @@ class DataManager:
             
             meeting = {
                 'id': i + 1,
+                'booking_id': i + 1,
                 'title': f"{random.choice(meeting_types)} - {self.fake.sentence(nb_words=3)}",
+                'meeting_title': f"{random.choice(meeting_types)} - {self.fake.sentence(nb_words=3)}",
                 'room_id': random.randint(1, 8),
                 'organizer_id': random.randint(1, 20),
                 'start_time': start_time,
+                'start_datetime': start_time,
                 'end_time': start_time + timedelta(minutes=duration),
+                'end_datetime': start_time + timedelta(minutes=duration),
                 'duration': duration,
+                'duration_minutes': duration,
                 'participants': random.randint(3, 15),
+                'participant_count': random.randint(3, 15),
                 'type': random.choice(meeting_types),
+                'meeting_type': random.choice(meeting_types),
                 'status': random.choice(['已确认', '待确认', '已取消']),
                 'description': self.fake.text(max_nb_chars=200)
             }
@@ -100,6 +189,7 @@ class DataManager:
         for i in range(30):
             task = {
                 'id': i + 1,
+                'task_id': i + 1,
                 'title': f"{random.choice(task_types)} - {self.fake.sentence(nb_words=4)}",
                 'description': self.fake.text(max_nb_chars=150),
                 'assignee_id': random.randint(1, 20),
@@ -121,8 +211,11 @@ class DataManager:
         for i in range(25):
             minute = {
                 'id': i + 1,
+                'minute_id': i + 1,
                 'meeting_id': i + 1,
+                'booking_id': i + 1,
                 'title': f"会议纪要 - {self.fake.sentence(nb_words=3)}",
+                'meeting_title': f"会议纪要 - {self.fake.sentence(nb_words=3)}",
                 'summary': self.fake.text(max_nb_chars=300),
                 'decisions': [self.fake.sentence() for _ in range(random.randint(2, 5))],
                 'action_items': [self.fake.sentence() for _ in range(random.randint(3, 8))],
@@ -142,22 +235,161 @@ class DataManager:
     def get_dataframe(self, data_type):
         """Get specific data as pandas DataFrame"""
         if data_type in self.mock_data:
-            return pd.DataFrame(self.mock_data[data_type])
+            df = pd.DataFrame(self.mock_data[data_type])
+            
+            # Convert datetime columns for consistency
+            if data_type == 'meetings':
+                datetime_cols = ['start_datetime', 'end_datetime', 'created_datetime']
+                for col in datetime_cols:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                        
+                # Ensure legacy column names exist
+                if 'start_datetime' in df.columns and 'start_time' not in df.columns:
+                    df['start_time'] = df['start_datetime']
+                if 'end_datetime' in df.columns and 'end_time' not in df.columns:
+                    df['end_time'] = df['end_datetime']
+                if 'duration_minutes' in df.columns and 'duration' not in df.columns:
+                    df['duration'] = df['duration_minutes']
+                if 'participant_count' in df.columns and 'participants' not in df.columns:
+                    df['participants'] = df['participant_count']
+                    
+            elif data_type == 'tasks':
+                datetime_cols = ['deadline', 'created_datetime', 'updated_datetime']
+                for col in datetime_cols:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                        
+                # Ensure legacy column names exist
+                if 'created_datetime' in df.columns and 'created_at' not in df.columns:
+                    df['created_at'] = df['created_datetime']
+                if 'department_id' in df.columns and 'department' not in df.columns:
+                    # Map department_id to department name
+                    dept_mapping = {
+                        1: '研发部', 2: '测试部', 3: '架构部', 4: '产品部', 5: '运营部',
+                        6: '设计部', 7: '市场部', 8: '销售部', 9: '人事部', 10: '财务部'
+                    }
+                    df['department'] = df['department_id'].map(dept_mapping)
+                    
+            elif data_type == 'minutes':
+                datetime_cols = ['created_datetime', 'updated_datetime']
+                for col in datetime_cols:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                        
+                # Ensure legacy column names exist
+                if 'created_datetime' in df.columns and 'created_at' not in df.columns:
+                    df['created_at'] = df['created_datetime']
+                if 'updated_datetime' in df.columns and 'updated_at' not in df.columns:
+                    df['updated_at'] = df['updated_datetime']
+                if 'minute_id' in df.columns and 'id' not in df.columns:
+                    df['id'] = df['minute_id']
+                if 'booking_id' in df.columns and 'meeting_id' not in df.columns:
+                    df['meeting_id'] = df['booking_id']
+                    
+            elif data_type == 'users':
+                datetime_cols = ['created_date', 'last_login']
+                for col in datetime_cols:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                        
+                # Ensure legacy column names exist
+                if 'created_date' in df.columns and 'created_at' not in df.columns:
+                    df['created_at'] = df['created_date']
+                if 'user_id' in df.columns and 'id' not in df.columns:
+                    df['id'] = df['user_id']
+                if 'department_id' in df.columns and 'department' not in df.columns:
+                    # Map department_id to department name
+                    dept_mapping = {
+                        1: '研发部', 2: '测试部', 3: '架构部', 4: '产品部', 5: '运营部',
+                        6: '设计部', 7: '市场部', 8: '销售部', 9: '人事部', 10: '财务部'
+                    }
+                    df['department'] = df['department_id'].map(dept_mapping)
+                    
+            elif data_type == 'rooms':
+                # Ensure legacy column names exist
+                if 'room_id' in df.columns and 'id' not in df.columns:
+                    df['id'] = df['room_id']
+                if 'room_name' in df.columns and 'name' not in df.columns:
+                    df['name'] = df['room_name']
+                if 'room_type' in df.columns and 'type' not in df.columns:
+                    df['type'] = df['room_type']
+                    
+            return df
         return pd.DataFrame()
     
     def add_meeting(self, meeting_data):
         """Add a new meeting to the data"""
         meeting_data['id'] = len(self.mock_data['meetings']) + 1
+        meeting_data['booking_id'] = meeting_data['id']
         self.mock_data['meetings'].append(meeting_data)
     
     def add_task(self, task_data):
         """Add a new task to the data"""
         task_data['id'] = len(self.mock_data['tasks']) + 1
+        task_data['task_id'] = task_data['id']
         self.mock_data['tasks'].append(task_data)
     
     def update_task_status(self, task_id, new_status):
         """Update task status"""
         for task in self.mock_data['tasks']:
-            if task['id'] == task_id:
+            if task.get('id') == task_id or task.get('task_id') == task_id:
                 task['status'] = new_status
-                break 
+                break
+    
+    def get_room_recommendations(self, capacity, equipment_needed=None, location_preference=None):
+        """Get room recommendations based on requirements"""
+        rooms_df = self.get_dataframe('rooms')
+        
+        # Filter by capacity and availability
+        suitable_rooms = rooms_df[
+            (rooms_df['capacity'] >= capacity) & 
+            (rooms_df['status'] == '可用')
+        ]
+        
+        # Filter by equipment if specified
+        if equipment_needed:
+            if '投影仪' in equipment_needed:
+                suitable_rooms = suitable_rooms[suitable_rooms['has_projector'] == 1]
+            if '视频会议设备' in equipment_needed:
+                suitable_rooms = suitable_rooms[suitable_rooms['has_phone'] == 1]
+            if '白板' in equipment_needed:
+                suitable_rooms = suitable_rooms[suitable_rooms['has_whiteboard'] == 1]
+            if '显示屏' in equipment_needed:
+                suitable_rooms = suitable_rooms[suitable_rooms['has_screen'] == 1]
+        
+        # Filter by location if specified
+        if location_preference:
+            suitable_rooms = suitable_rooms[suitable_rooms['building_id'] == location_preference]
+        
+        return suitable_rooms.to_dict('records')
+    
+    def get_booking_statistics(self, stat_type=None, period=None):
+        """Get booking statistics"""
+        if 'statistics' not in self.mock_data:
+            return []
+            
+        stats = self.mock_data['statistics']
+        
+        if stat_type:
+            stats = [s for s in stats if s['stat_type'] == stat_type]
+        
+        if period:
+            stats = [s for s in stats if s['stat_period'] == period]
+            
+        return stats
+    
+    def get_user_requirements(self, user_id=None, status=None):
+        """Get user requirements"""
+        if 'requirements' not in self.mock_data:
+            return []
+            
+        requirements = self.mock_data['requirements']
+        
+        if user_id:
+            requirements = [r for r in requirements if r['user_id'] == user_id]
+        
+        if status:
+            requirements = [r for r in requirements if r['status'] == status]
+            
+        return requirements 
