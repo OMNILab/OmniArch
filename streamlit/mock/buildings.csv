@@ -1,0 +1,4 @@
+building_id,building_name,building_name_en,floor_count,total_rooms,address,description
+1,智慧大厦A座,Smart Building A,15,8,科技园区智慧大厦A座,主要承载研发和技术团队
+2,智慧大厦B座,Smart Building B,12,7,科技园区智慧大厦B座,主要承载产品和运营团队
+3,智慧大厦C座,Smart Building C,10,6,科技园区智慧大厦C座,主要承载市场和销售团队
