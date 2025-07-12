@@ -5,13 +5,15 @@ Handles common UI elements and styling for the smart meeting system
 
 import streamlit as st
 
+
 class UIComponents:
     """Common UI components and styling utilities"""
-    
+
     @staticmethod
     def apply_custom_css():
         """Apply custom CSS styling"""
-        st.markdown("""
+        st.markdown(
+            """
         <style>
         /* Modern theme styling */
         .main-header {
@@ -56,16 +58,7 @@ class UIComponents:
             font-weight: 700;
             margin: 0;
         }
-        
-        .modern-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 16px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            border: 1px solid #f3f4f6;
-            margin-bottom: 2rem;
-        }
-        
+
         .task-card {
             background: white;
             padding: 1rem;
@@ -183,23 +176,28 @@ class UIComponents:
             }
         }
         </style>
-        """, unsafe_allow_html=True)
-    
+        """,
+            unsafe_allow_html=True,
+        )
+
     @staticmethod
     def create_header(title: str):
         """Create a styled header"""
         st.markdown(f'<h1 class="main-header">{title}</h1>', unsafe_allow_html=True)
-    
+
     @staticmethod
     def create_metric_card(title: str, value: str):
         """Create a metric card"""
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div class="metric-card">
             <h3>{title}</h3>
             <h2>{value}</h2>
         </div>
-        """, unsafe_allow_html=True)
-    
+        """,
+            unsafe_allow_html=True,
+        )
+
     @staticmethod
     def create_status_badge(status: str, status_type: str = "status"):
         """Create a status badge"""
@@ -219,13 +217,17 @@ class UIComponents:
                 css_class = "priority-low"
         else:
             css_class = "status-available"
-        
-        st.markdown(f'<span class="status-badge {css_class}">{status}</span>', unsafe_allow_html=True)
-    
+
+        st.markdown(
+            f'<span class="status-badge {css_class}">{status}</span>',
+            unsafe_allow_html=True,
+        )
+
     @staticmethod
     def create_room_card(room_data: dict):
         """Create a room recommendation card"""
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div class="room-card">
             <h4 style="margin: 0 0 0.5rem 0; color: #1f2937;">{room_data['name']}</h4>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -237,27 +239,26 @@ class UIComponents:
                 <span class="status-badge status-available">{room_data['status']}</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
-    
+        """,
+            unsafe_allow_html=True,
+        )
+
     @staticmethod
     def create_task_card(task_data: dict, assignee_name: str):
         """Create a task card"""
-        priority_colors = {
-            '高': '#d62728',
-            '中': '#ff7f0e', 
-            '低': '#2ca02c'
-        }
-        priority_color = priority_colors.get(task_data['priority'], '#666')
-        
+        priority_colors = {"高": "#d62728", "中": "#ff7f0e", "低": "#2ca02c"}
+        priority_color = priority_colors.get(task_data["priority"], "#666")
+
         status_colors = {
-            '完成': '#2ca02c',
-            '进行中': '#ff7f0e',
-            '确认': '#1f77b4',
-            '草稿': '#666'
+            "完成": "#2ca02c",
+            "进行中": "#ff7f0e",
+            "确认": "#1f77b4",
+            "草稿": "#666",
         }
-        status_color = status_colors.get(task_data['status'], '#666')
-        
-        st.markdown(f"""
+        status_color = status_colors.get(task_data["status"], "#666")
+
+        st.markdown(
+            f"""
         <div class="task-card" style="border-left-color: {priority_color};">
             <h5 style="margin: 0 0 0.5rem 0; color: {priority_color};">{task_data['title']}</h5>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -269,14 +270,6 @@ class UIComponents:
                 <span style="background: {priority_color}; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">{task_data['priority']}</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
-    
-    @staticmethod
-    def create_modern_container():
-        """Create a modern container wrapper"""
-        st.markdown('<div class="modern-card">', unsafe_allow_html=True)
-    
-    @staticmethod
-    def close_modern_container():
-        """Close a modern container wrapper"""
-        st.markdown('</div>', unsafe_allow_html=True) 
+        """,
+            unsafe_allow_html=True,
+        )
