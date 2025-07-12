@@ -66,8 +66,8 @@ def main():
         if st.button("📊 数据面板", use_container_width=True):
             st.session_state.current_page = "数据面板"
 
-        if st.button("🤖 智能数据分析", use_container_width=True):
-            st.session_state.current_page = "智能数据分析"
+        if st.button("🤖 智能分析", use_container_width=True):
+            st.session_state.current_page = "智能分析"
 
         if st.button("⚙️ 系统设置", use_container_width=True):
             st.session_state.current_page = "系统设置"
@@ -89,7 +89,7 @@ def main():
         pages.show_tasks_page()
     elif page == "数据面板":
         pages.show_dashboard_page()
-    elif page == "智能数据分析":
+    elif page == "智能分析":
         pages.show_pandasai_demo()
     elif page == "系统设置":
         pages.show_settings_page()

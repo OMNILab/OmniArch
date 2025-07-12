@@ -1100,7 +1100,7 @@ class Pages:
 
     def show_pandasai_demo(self):
         """PandasAI demo page implementation with enhanced functionality"""
-        self.ui.create_header("智能数据分析")
+        self.ui.create_header("智能分析")
 
         st.markdown("### 数据分析工具")
 
