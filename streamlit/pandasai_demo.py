@@ -4,11 +4,12 @@ pandasAI 集成演示
 """
 
 import pandas as pd
-from pandasai import PandasAI
-from pandasai.llm.openai import OpenAI
+from pandasai import Agent
+from pandasai.llm import OpenAI
 import streamlit as st
 from faker import Faker
 import random
+import os
 from datetime import datetime, timedelta
 
 # 初始化 Faker
@@ -95,10 +96,9 @@ def generate_demo_data():
 def setup_pandasai():
     """设置 pandasAI"""
     try:
-        # 注意：这里需要设置 OpenAI API Key
-        # 在实际使用中，应该从环境变量或配置文件中读取
-        llm = OpenAI(api_token="your-openai-api-key-here")
-        pandas_ai = PandasAI(llm, verbose=True)
+        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        llm = OpenAI(api_token=OPENAI_API_KEY)
+        pandas_ai = Agent(llm, verbose=True)
         return pandas_ai
     except Exception as e:
         st.warning(f"pandasAI 设置失败: {e}")
@@ -154,7 +154,7 @@ def demo_pandasai_queries():
 
                 with st.spinner("正在执行智能查询..."):
                     # 执行查询
-                    response = pandas_ai.run(merged_df, prompt=selected_query)
+                    response = pandas_ai.chat(merged_df, selected_query)
 
                     st.success("查询完成！")
                     st.markdown("### 📈 查询结果")
@@ -183,7 +183,7 @@ def demo_pandasai_queries():
                 merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
 
                 with st.spinner("正在执行自定义查询..."):
-                    response = pandas_ai.run(merged_df, prompt=custom_query)
+                    response = pandas_ai.chat(merged_df, custom_query)
 
                     st.success("查询完成！")
                     st.markdown("### 📈 查询结果")

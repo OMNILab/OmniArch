@@ -26,15 +26,6 @@ class Config:
     # 日志配置
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-    # 安全配置
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
-
-    # 模拟数据配置
-    MOCK_USERS_COUNT = 20
-    MOCK_ROOMS_COUNT = 15
-    MOCK_MEETINGS_COUNT = 50
-    MOCK_TASKS_COUNT = 30
-
     # 功能开关
     ENABLE_PANDASAI = bool(OPENAI_API_KEY)
     ENABLE_VOICE_RECOGNITION = False  # PoC 版本暂未实现
