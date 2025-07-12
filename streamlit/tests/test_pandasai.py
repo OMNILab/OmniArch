@@ -1,6 +1,12 @@
 """
 pandasAI 集成演示
 展示如何在智慧会议系统中使用 pandasAI 进行智能数据查询
+
+Run with:
+
+```bash
+streamlit run tests/test_pandasai.py
+```
 """
 
 import pandas as pd

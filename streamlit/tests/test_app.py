@@ -1,5 +1,11 @@
 """
 Test script to verify the enhanced smart meeting system functionality
+
+Run with:
+
+```bash
+streamlit run tests/test_app.py
+```
 """
 
 import streamlit as st
@@ -7,7 +13,7 @@ import sys
 import os
 
 # Add the streamlit directory to the path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
 
 from modules.data_manager import DataManager
 from modules.auth_manager import AuthManager
