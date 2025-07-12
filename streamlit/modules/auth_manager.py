@@ -1,6 +1,6 @@
 """
 Authentication Manager Module
-Handles user authentication and session management
+Handles user authentication and session management with enhanced session state
 """
 
 import streamlit as st
@@ -19,8 +19,8 @@ class AuthManager:
             st.session_state.authenticated = False
         if 'current_user' not in st.session_state:
             st.session_state.current_user = None
-        if 'mock_data' not in st.session_state:
-            st.session_state.mock_data = self.data_manager.get_data()
+        if 'login_attempts' not in st.session_state:
+            st.session_state.login_attempts = 0
     
     def login(self, username: str, password: str) -> bool:
         """
@@ -33,6 +33,9 @@ class AuthManager:
         Returns:
             bool: True if authentication successful, False otherwise
         """
+        # Increment login attempts
+        st.session_state.login_attempts += 1
+        
         # For demo purposes, accept any username/password
         # In real implementation, this would validate against database
         
@@ -49,9 +52,10 @@ class AuthManager:
                 'email': f"{username}@company.com",
                 'department': '研发部',
                 'role': '会议组织者',
-                'created_at': '2024-01-01'
+                'created_at': '2024-01-01',
+                'last_login': st.session_state.get('current_time', '2024-01-01')
             }
-            self.data_manager.mock_data['users'].append(demo_user)
+            st.session_state.mock_data['users'].append(demo_user)
             user_data = demo_user
         else:
             user_data = user.iloc[0].to_dict()
@@ -59,13 +63,18 @@ class AuthManager:
         # Set session state
         st.session_state.authenticated = True
         st.session_state.current_user = user_data
+        st.session_state.login_time = st.session_state.get('current_time', '2024-01-01')
         
         return True
     
     def logout(self):
-        """Logout current user"""
+        """Logout current user and clear session state"""
         st.session_state.authenticated = False
         st.session_state.current_user = None
+        st.session_state.login_attempts = 0
+        # Clear any user-specific session data
+        if 'user_preferences' in st.session_state:
+            del st.session_state['user_preferences']
     
     def is_authenticated(self) -> bool:
         """Check if user is authenticated"""
@@ -81,12 +90,62 @@ class AuthManager:
             return st.session_state.current_user.get('role', '会议参与者')
         return '会议参与者'
     
+    def get_user_department(self) -> str:
+        """Get current user's department"""
+        if st.session_state.current_user:
+            return st.session_state.current_user.get('department', '未分配')
+        return '未分配'
+    
+    def get_user_id(self) -> int:
+        """Get current user's ID"""
+        if st.session_state.current_user:
+            return st.session_state.current_user.get('id', 0)
+        return 0
+    
     def is_admin(self) -> bool:
         """Check if current user is admin"""
         return self.get_user_role() == '系统管理员'
+    
+    def is_organizer(self) -> bool:
+        """Check if current user is meeting organizer"""
+        return self.get_user_role() == '会议组织者'
     
     def require_auth(self):
         """Decorator to require authentication for pages"""
         if not self.is_authenticated():
             st.error("请先登录")
-            st.stop() 
+            st.stop()
+    
+    def require_admin(self):
+        """Decorator to require admin privileges"""
+        if not self.is_authenticated():
+            st.error("请先登录")
+            st.stop()
+        if not self.is_admin():
+            st.error("您没有权限访问此页面")
+            st.stop()
+    
+    def get_user_preferences(self) -> Dict[str, Any]:
+        """Get user preferences from session state"""
+        if 'user_preferences' not in st.session_state:
+            st.session_state.user_preferences = {
+                'theme': 'light',
+                'language': 'zh_CN',
+                'notifications': True,
+                'auto_save': True
+            }
+        return st.session_state.user_preferences
+    
+    def update_user_preference(self, key: str, value: Any):
+        """Update user preference in session state"""
+        preferences = self.get_user_preferences()
+        preferences[key] = value
+        st.session_state.user_preferences = preferences
+    
+    def get_login_history(self) -> Dict[str, Any]:
+        """Get login history for current session"""
+        return {
+            'login_attempts': st.session_state.get('login_attempts', 0),
+            'login_time': st.session_state.get('login_time', None),
+            'current_user': st.session_state.get('current_user', None)
+        } 
