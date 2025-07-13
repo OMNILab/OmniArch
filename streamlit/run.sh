@@ -6,7 +6,13 @@ echo "🎨 启动智慧会议系统..."
 
 # 检查 Python 是否安装
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python3 未安装，请先安装 Python 3.8+"
+    echo "❌ Python3 未安装，请先安装 Python 3.9+"
+    exit 1
+fi
+
+# 检查 Poetry 是否安装
+if ! command -v poetry &> /dev/null; then
+    echo "❌ Poetry 未安装，请先安装 Poetry (https://python-poetry.org/docs/#installation)"
     exit 1
 fi
 
@@ -16,12 +22,9 @@ if [ ! -f "app.py" ]; then
     exit 1
 fi
 
-# 检查依赖是否安装
-echo "📦 检查依赖..."
-if ! python3 -c "import streamlit" &> /dev/null; then
-    echo "📥 安装依赖..."
-    pip install -r requirements.txt
-fi
+# 安装依赖
+echo "📦 检查并安装依赖..."
+poetry install
 
 # 启动应用
 echo "🚀 启动 Streamlit 应用..."
@@ -29,4 +32,4 @@ echo "📱 应用将在浏览器中打开: http://localhost:8501"
 echo "🛑 按 Ctrl+C 停止应用"
 echo ""
 
-streamlit run app.py --server.port 8501 --server.address 0.0.0.0 
+poetry run streamlit run app.py --server.port 8501 --server.address 0.0.0.0 
