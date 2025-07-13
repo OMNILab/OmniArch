@@ -18,23 +18,68 @@ from faker import Faker
 import random
 import os
 from datetime import datetime, timedelta
-import litellm
+import openai
 
 # 初始化 Faker
 fake = Faker("zh_CN")
 
-# 配置 litellm 以支持 DashScope
-litellm.set_verbose = True
 
+class DashScopeOpenAI(OpenAI):
+    """Custom OpenAI class for DashScope's Qwen models"""
+
+    _supported_chat_models = [
+        "qwen-plus",
+        "qwen-turbo",
+        "qwen-max",
+        # Add other Qwen models as needed from DashScope documentation
+    ]
+
+    def __init__(self, api_token: str, model: str = "qwen-plus", **kwargs):
+        """
+        Initialize the DashScopeOpenAI class with DashScope's API base and Qwen model.
+
+        Args:
+            api_token (str): DashScope API key.
+            model (str): Qwen model name (e.g., 'qwen-plus').
+            **kwargs: Additional parameters for the OpenAI client.
+        """
+        # Set DashScope's API base
+        kwargs["api_base"] = kwargs.get("api_base", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
+        
+        # Initialize the parent OpenAI class
+        super().__init__(api_token=api_token, model=model, **kwargs)
+
+        # Force chat model client for Qwen models
+        self._is_chat_model = True
+        self.client = (
+            openai.OpenAI(**self._client_params).chat.completions
+            if self.is_openai_v1()
+            else openai.ChatCompletion
+        )
+
+    def is_openai_v1(self) -> bool:
+        """
+        Check if the openai library version is >= 1.0.
+        
+        Returns:
+            bool: True if openai version is >= 1.0, False otherwise.
+        """
+        import openai
+        try:
+            # For openai >= 1.0, the version is stored in openai.__version__
+            version = openai.__version__
+            major_version = int(version.split('.')[0])
+            return major_version >= 1
+        except AttributeError:
+            # For older versions, assume pre-1.0
+            return False
 
 def setup_pandasai():
     """设置 pandasAI"""
     try:
-        # 使用 DashScope 兼容模式配置
-        llm = OpenAI(
-            api_token=os.environ["DASHSCOPE_API_KEY"],
-            model="qwen-turbo",
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        llm = DashScopeOpenAI(
+            api_token=os.getenv("DASHSCOPE_API_KEY"),
+            model="qwen-plus"
         )
         return llm
     except Exception as e:
@@ -342,51 +387,78 @@ def show_advanced_analytics():
         # 可视化
         import plotly.express as px
 
-        fig = px.bar(
-            cost_analysis, x="room_name", y="每分钟成本", title="会议室每分钟成本对比"
+        fig = px.scatter(
+            cost_analysis,
+            x="每分钟成本",
+            y="每人成本",
+            size="cost",
+            hover_data=["room_name"],
+            title="会议室成本效益分析",
         )
         st.plotly_chart(fig, use_container_width=True)
 
     elif analysis_type == "时间趋势分析":
         st.markdown("### 📈 时间趋势分析")
 
-        # 按日期统计
-        meetings_df["date"] = meetings_df["start_time"].dt.date
-        daily_stats = (
-            meetings_df.groupby("date")
-            .agg(
-                {
-                    "meeting_id": "count",
-                    "duration_minutes": "sum",
-                    "participants": "sum",
-                }
-            )
+        # 按时间统计
+        time_analysis = (
+            merged_df.groupby(merged_df["start_time"].dt.date)
+            .agg({"meeting_id": "count", "duration_minutes": "sum", "cost": "sum"})
             .reset_index()
         )
 
-        daily_stats.columns = ["日期", "会议数量", "总时长", "总参与人数"]
+        time_analysis.columns = ["日期", "会议次数", "总时长", "总成本"]
 
-        st.dataframe(daily_stats, use_container_width=True)
+        st.dataframe(time_analysis, use_container_width=True)
 
         # 可视化
         import plotly.express as px
 
-        fig = px.line(daily_stats, x="日期", y="会议数量", title="每日会议数量趋势")
+        fig = px.line(
+            time_analysis, x="日期", y="会议次数", title="每日会议数量趋势"
+        )
         st.plotly_chart(fig, use_container_width=True)
+
+        fig2 = px.line(
+            time_analysis, x="日期", y="总成本", title="每日会议成本趋势"
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+
+def main():
+    """主函数"""
+    st.set_page_config(
+        page_title="pandasAI 智能查询演示",
+        page_icon="🤖",
+        layout="wide",
+    )
+
+    st.title("🤖 pandasAI 智能查询演示")
+    st.markdown("展示如何在智慧会议系统中使用 pandasAI 进行智能数据查询")
+
+    # 侧边栏
+    st.sidebar.title("功能选择")
+    demo_type = st.sidebar.selectbox(
+        "选择演示类型", ["智能查询演示", "高级数据分析"]
+    )
+
+    if demo_type == "智能查询演示":
+        demo_pandasai_queries()
+    else:
+        show_advanced_analytics()
+
+    # 底部信息
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📝 使用说明")
+    st.sidebar.markdown(
+        """
+        1. 确保设置了 `DASHSCOPE_API_KEY` 环境变量
+        2. 选择查询示例或输入自定义查询
+        3. 点击执行按钮开始查询
+        4. 查看智能分析结果
+        """
+    )
 
 
 if __name__ == "__main__":
-    st.set_page_config(page_title="pandasAI 演示", layout="wide")
-
-    st.markdown("# 🤖 pandasAI 智能查询演示")
-    st.markdown(
-        "本演示展示了如何在智慧会议系统中使用 pandasAI 进行智能数据查询和分析。"
-    )
-
-    tab1, tab2 = st.tabs(["智能查询", "高级分析"])
-
-    with tab1:
-        demo_pandasai_queries()
-
-    with tab2:
-        show_advanced_analytics()
+    main()
