@@ -9,7 +9,7 @@ import plotly.express as px
 from datetime import datetime
 
 
-class PandasAIDemoPage:
+class AnalysisPage:
     """PandasAI demo page implementation with enhanced functionality"""
 
     def __init__(self, data_manager, auth_manager, ui_components):

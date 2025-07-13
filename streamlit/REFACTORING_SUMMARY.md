@@ -15,7 +15,7 @@ streamlit/modules/pages.py (1338 lines)
     ├── show_tasks_page()
     ├── show_dashboard_page()
     ├── show_settings_page()
-    └── show_pandasai_demo()
+    └── show_analysis_page()
 ```
 
 ### After (Modular Structure)
@@ -28,7 +28,7 @@ streamlit/modules/pages/
 ├── tasks.py                    # TasksPage class
 ├── dashboard.py                # DashboardPage class
 ├── settings.py                 # SettingsPage class
-└── pandasai_demo.py           # PandasAIDemoPage class
+└── analysis.py           # AnalysisPage class
 
 streamlit/modules/pages.py      # Main Pages coordinator class
 ```
@@ -59,7 +59,7 @@ streamlit/modules/pages.py      # Main Pages coordinator class
    - System configuration and admin functions
    - 208 lines, user and system management
 
-7. **PandasAIDemoPage** (`pandasai_demo.py`)
+7. **AnalysisPage** (`analysis.py`)
    - AI-powered data analysis
    - 256 lines, natural language query processing
 

@@ -86,7 +86,7 @@ def main():
     elif page == "数据面板":
         pages.show_dashboard_page()
     elif page == "智能分析":
-        pages.show_pandasai_demo()
+        pages.show_analysis_page()
     elif page == "系统设置":
         pages.show_settings_page()
 

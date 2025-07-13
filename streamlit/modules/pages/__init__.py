@@ -9,14 +9,14 @@ from .minutes import MinutesPage
 from .tasks import TasksPage
 from .dashboard import DashboardPage
 from .settings import SettingsPage
-from .pandasai_demo import PandasAIDemoPage
+from .analysis import AnalysisPage
 
 __all__ = [
     "LoginPage",
-    "BookingPage", 
+    "BookingPage",
     "MinutesPage",
     "TasksPage",
     "DashboardPage",
     "SettingsPage",
-    "PandasAIDemoPage"
+    "AnalysisPage",
 ]
