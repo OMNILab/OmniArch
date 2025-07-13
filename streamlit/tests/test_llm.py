@@ -3,7 +3,7 @@ Simple OpenAI SDK Test for Qwen Models
 Command-line version for testing OpenAI SDK with DashScope compatible API
 
 Usage:
-    python tests/test_openai_simple.py
+    python tests/test_llm.py
 """
 
 import os
@@ -16,20 +16,12 @@ def test_basic_connection():
     print("🔍 Testing basic connection...")
 
     # Check environment variables
-    api_key = os.getenv("OPENAI_API_KEY")
-    api_base = os.getenv("OPENAI_API_BASE")
+    api_key = os.getenv("DASHSCOPE_API_KEY")
+    api_base = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
     if not api_key or not api_base:
         print("❌ Environment variables not set!")
-        print("Please set:")
-        print("export OPENAI_API_KEY='your_dashscope_api_key'")
-        print(
-            "export OPENAI_API_BASE='https://dashscope.aliyuncs.com/compatible-mode/v1'"
-        )
         return None
-
-    print(f"✅ API Key: {api_key[:8]}...")
-    print(f"✅ API Base: {api_base}")
 
     # Initialize OpenAI client
     try:
@@ -209,18 +201,18 @@ def test_function_calling(client):
             messages=[
                 {"role": "user", "content": "What's the weather like in Beijing today?"}
             ],
-            functions=functions,
-            function_call="auto",
+            tools=functions,
+            tool_choice="auto",
             max_tokens=200,
         )
 
         print("✅ Function calling response:")
 
         # Check if there's a function call
-        if response.choices[0].message.function_call:
-            function_call = response.choices[0].message.function_call
-            print(f"📞 Function called: {function_call.name}")
-            print(f"📋 Arguments: {json.loads(function_call.arguments)}")
+        if response.choices[0].message.tool_calls:
+            tool_call = response.choices[0].message.tool_calls[0]
+            print(f"📞 Function called: {tool_call.function.name}")
+            print(f"📋 Arguments: {json.loads(tool_call.function.arguments)}")
         else:
             print("💬 Regular response:")
             print(response.choices[0].message.content)

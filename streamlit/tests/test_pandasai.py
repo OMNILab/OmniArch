@@ -10,16 +10,47 @@ streamlit run tests/test_pandasai.py
 """
 
 import pandas as pd
-from pandasai import Agent
+from pandasai import SmartDataframe
+from pandasai.config import Config
 from pandasai.llm.openai import OpenAI
 import streamlit as st
 from faker import Faker
 import random
 import os
 from datetime import datetime, timedelta
+import litellm
 
 # 初始化 Faker
 fake = Faker("zh_CN")
+
+# 配置 litellm 以支持 DashScope
+litellm.set_verbose = True
+
+
+def setup_pandasai():
+    """设置 pandasAI"""
+    try:
+        # 使用 DashScope 兼容模式配置
+        llm = OpenAI(
+            api_token=os.environ["DASHSCOPE_API_KEY"],
+            model="qwen-turbo",
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+        return llm
+    except Exception as e:
+        st.warning(f"pandasAI 设置失败: {e}")
+        return None
+
+
+def create_smart_dataframe(df, llm):
+    """创建 SmartDataframe"""
+    try:
+        config = Config(llm=llm, verbose=True)
+        smart_df = SmartDataframe(df, config=config)
+        return smart_df
+    except Exception as e:
+        st.error(f"创建 SmartDataframe 失败: {e}")
+        return None
 
 
 def generate_demo_data():
@@ -99,22 +130,6 @@ def generate_demo_data():
     )
 
 
-def setup_pandasai():
-    """设置 pandasAI"""
-    try:
-        llm = OpenAI(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            base_url=os.getenv("OPENAI_API_BASE"),
-            model="qwen-turbo-2025-04-28",
-        )
-        pandas_ai = Agent(llm, verbose=True)
-        return pandas_ai
-    except Exception as e:
-        st.warning(f"pandasAI 设置失败: {e}")
-        st.info("请设置正确的 OpenAI API Key 来启用智能查询功能")
-        return None
-
-
 def demo_pandasai_queries():
     """演示 pandasAI 查询功能"""
 
@@ -154,20 +169,23 @@ def demo_pandasai_queries():
     selected_query = st.selectbox("选择查询示例", query_examples)
 
     if st.button("🚀 执行智能查询"):
-        pandas_ai = setup_pandasai()
+        llm = setup_pandasai()
 
-        if pandas_ai:
+        if llm:
             try:
                 # 合并数据以便查询
                 merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
 
                 with st.spinner("正在执行智能查询..."):
                     # 执行查询
-                    response = pandas_ai.chat(merged_df, selected_query)
-
-                    st.success("查询完成！")
-                    st.markdown("### 📈 查询结果")
-                    st.write(response)
+                    smart_df = create_smart_dataframe(merged_df, llm)
+                    if smart_df:
+                        response = smart_df.chat(selected_query)
+                        st.success("查询完成！")
+                        st.markdown("### 📈 查询结果")
+                        st.write(response)
+                    else:
+                        st.error("无法创建智能数据框")
 
             except Exception as e:
                 st.error(f"查询执行失败: {e}")
@@ -185,18 +203,21 @@ def demo_pandasai_queries():
     )
 
     if st.button("🔍 执行自定义查询") and custom_query:
-        pandas_ai = setup_pandasai()
+        llm = setup_pandasai()
 
-        if pandas_ai:
+        if llm:
             try:
                 merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
 
                 with st.spinner("正在执行自定义查询..."):
-                    response = pandas_ai.chat(merged_df, custom_query)
-
-                    st.success("查询完成！")
-                    st.markdown("### 📈 查询结果")
-                    st.write(response)
+                    smart_df = create_smart_dataframe(merged_df, llm)
+                    if smart_df:
+                        response = smart_df.chat(custom_query)
+                        st.success("查询完成！")
+                        st.markdown("### 📈 查询结果")
+                        st.write(response)
+                    else:
+                        st.error("无法创建智能数据框")
 
             except Exception as e:
                 st.error(f"查询执行失败: {e}")
