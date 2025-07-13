@@ -11,7 +11,7 @@ streamlit run tests/test_pandasai.py
 
 import pandas as pd
 from pandasai import Agent
-from pandasai.llm import OpenAI
+from pandasai.llm.openai import OpenAI
 import streamlit as st
 from faker import Faker
 import random
@@ -102,8 +102,11 @@ def generate_demo_data():
 def setup_pandasai():
     """设置 pandasAI"""
     try:
-        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-        llm = OpenAI(api_token=OPENAI_API_KEY)
+        llm = OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            base_url=os.getenv("OPENAI_API_BASE"),
+            model="qwen-turbo-2025-04-28",
+        )
         pandas_ai = Agent(llm, verbose=True)
         return pandas_ai
     except Exception as e:

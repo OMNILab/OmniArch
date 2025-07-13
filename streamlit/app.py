@@ -7,7 +7,7 @@ import streamlit as st
 from modules.data_manager import DataManager
 from modules.auth_manager import AuthManager
 from modules.ui_components import UIComponents
-from modules.pages import Pages
+from modules.pages_manager import Pages
 
 
 def main():
@@ -40,14 +40,10 @@ def main():
 
     # Sidebar navigation
     with st.sidebar:
-        st.markdown("### 智慧会议系统")
         st.markdown(f"欢迎，{current_user['name']}")
         st.markdown(f"角色：{current_user['role']}")
 
         st.markdown("---")
-
-        # Navigation menu - expanded buttons
-        st.markdown("**功能模块**")
 
         # Initialize session state for current page if not exists
         if "current_page" not in st.session_state:

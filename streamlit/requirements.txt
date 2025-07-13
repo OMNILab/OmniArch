@@ -6,6 +6,9 @@ pandasai>=2.1.0,<2.3.0
 streamlit-aggrid>=1.1.0
 streamlit-card>=1.0.0
 streamlit-plotly-events>=0.0.6
+openai>=1.0.0
+langgraph>=0.5.0
+langchain-community>=0.3.0
 # Testing dependencies
 pytest>=7.0.0
 pytest-mock>=3.10.0 
