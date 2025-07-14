@@ -15,10 +15,10 @@ import os
 # Add the streamlit directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
 
-from modules.data_manager import DataManager
-from modules.auth_manager import AuthManager
-from modules.ui_components import UIComponents
-from modules.pages import Pages
+from smartmeeting.data_manager import DataManager
+from smartmeeting.auth_manager import AuthManager
+from smartmeeting.ui_components import UIComponents
+from smartmeeting.pages import Pages
 
 
 def test_data_manager():

@@ -13,7 +13,7 @@ from pandasai.config import Config
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
 
-from modules.llm import DashScopeOpenAI
+from smartmeeting.llm import DashScopeOpenAI
 
 
 def test_dashscope_pandasai_integration():

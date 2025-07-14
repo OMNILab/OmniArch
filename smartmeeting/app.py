@@ -4,10 +4,10 @@ Main application file that uses modular components
 """
 
 import streamlit as st
-from modules.data_manager import DataManager
-from modules.auth_manager import AuthManager
-from modules.ui_components import UIComponents
-from modules.pages_manager import Pages
+from smartmeeting.data_manager import DataManager
+from smartmeeting.auth_manager import AuthManager
+from smartmeeting.ui_components import UIComponents
+from smartmeeting.pages_manager import Pages
 
 
 def main():

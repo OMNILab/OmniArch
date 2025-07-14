@@ -10,18 +10,6 @@ from datetime import datetime
 import os
 import sys
 
-# Add the parent directory to the path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Import DashScopeOpenAI for AI-powered analysis
-try:
-    from modules.llm import DashScopeOpenAI
-
-    DASHSCOPE_AVAILABLE = True
-except ImportError:
-    DASHSCOPE_AVAILABLE = False
-    st.warning("DashScopeOpenAI not available. Using mock analysis.")
-
 
 class AnalysisPage:
     """PandasAI demo page implementation with enhanced functionality"""
@@ -33,7 +21,10 @@ class AnalysisPage:
 
     def setup_dashscope_llm(self):
         """Setup DashScope LLM for AI analysis"""
-        if not DASHSCOPE_AVAILABLE:
+        try:
+            from smartmeeting.llm import DashScopeOpenAI
+        except ImportError:
+            st.warning("DashScopeOpenAI not available. Using mock analysis.")
             return None
 
         try:

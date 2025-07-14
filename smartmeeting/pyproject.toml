@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Smart Meeting System - A Streamlit-based intelligent meeting management application"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
-packages = [{include = "modules"}]
+packages = [{include = "smartmeeting"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"

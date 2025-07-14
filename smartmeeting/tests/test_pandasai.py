@@ -8,6 +8,7 @@ Run with:
 streamlit run tests/test_pandasai.py
 ```
 """
+
 import sys
 import pandas as pd
 import plotly.express as px
@@ -25,7 +26,8 @@ from matplotlib.figure import Figure as MatplotlibFigure
 
 
 # Setup fonts
-from modules.plots import setup_matplotlib_fonts
+from smartmeeting.plots import setup_matplotlib_fonts
+
 setup_matplotlib_fonts()
 
 # 初始化 Faker
@@ -34,8 +36,11 @@ fake = Faker("zh_CN")
 
 def setup_pandasai():
     try:
-        from modules.llm import DashScopeOpenAI
-        llm = DashScopeOpenAI(api_token=os.getenv("DASHSCOPE_API_KEY"), model="qwen-plus")
+        from smartmeeting.llm import DashScopeOpenAI
+
+        llm = DashScopeOpenAI(
+            api_token=os.getenv("DASHSCOPE_API_KEY"), model="qwen-plus"
+        )
         return llm
     except Exception as e:
         st.warning(f"pandasAI 设置失败: {e}")
@@ -44,17 +49,19 @@ def setup_pandasai():
 
 def create_pandasai_agent(df, llm):
     try:
-        pai.config.set({
-            "llm": llm,
-            "verbose": False,
-            "max_retries": 3,
-            "enforce_privacy": True,
-            "enable_logging": True,
-            "enable_plotting": True,
-            "save_charts": False,
-            "plotting_engine": "plotly",
-            "plotting_library": "plotly",
-        })
+        pai.config.set(
+            {
+                "llm": llm,
+                "verbose": False,
+                "max_retries": 3,
+                "enforce_privacy": True,
+                "enable_logging": True,
+                "enable_plotting": True,
+                "save_charts": False,
+                "plotting_engine": "plotly",
+                "plotting_library": "plotly",
+            }
+        )
         agent = Agent([pai.DataFrame(df)])
         return agent
     except Exception as e:
@@ -77,7 +84,9 @@ def render_pandasai_response(response, query: str = "") -> bool:
             elif isinstance(chart_value, str) and chart_value.endswith(".png"):
                 st.image(chart_value)
             else:
-                st.warning(f"无法识别的 ChartResponse 图表内容类型: {type(chart_value)}")
+                st.warning(
+                    f"无法识别的 ChartResponse 图表内容类型: {type(chart_value)}"
+                )
                 st.write(chart_value)
             return True
 
@@ -131,15 +140,19 @@ def generate_demo_data():
     floors = ["A", "B", "C"]
 
     for i in range(10):
-        rooms_data.append({
-            "room_id": i + 1,
-            "room_name": f"{random.choice(floors)}{random.randint(101, 999)}{random.choice(room_types)}",
-            "floor": random.choice(floors),
-            "capacity": random.choice([4, 6, 8, 12, 20, 30]),
-            "room_type": random.choice(room_types),
-            "equipment": random.choice(["基础设备", "视频会议设备", "投影设备", "白板设备"]),
-            "hourly_rate": random.randint(50, 200),
-        })
+        rooms_data.append(
+            {
+                "room_id": i + 1,
+                "room_name": f"{random.choice(floors)}{random.randint(101, 999)}{random.choice(room_types)}",
+                "floor": random.choice(floors),
+                "capacity": random.choice([4, 6, 8, 12, 20, 30]),
+                "room_type": random.choice(room_types),
+                "equipment": random.choice(
+                    ["基础设备", "视频会议设备", "投影设备", "白板设备"]
+                ),
+                "hourly_rate": random.randint(50, 200),
+            }
+        )
 
     meetings_data = []
     topics = ["产品评审", "技术讨论", "项目规划", "客户会议", "团队建设", "培训会议"]
@@ -150,34 +163,42 @@ def generate_demo_data():
         duration = random.choice([30, 60, 90, 120, 180])
         end_time = start_time + timedelta(minutes=duration)
 
-        meetings_data.append({
-            "meeting_id": i + 1,
-            "title": random.choice(topics),
-            "room_id": random.randint(1, 10),
-            "department": random.choice(departments),
-            "start_time": start_time,
-            "end_time": end_time,
-            "duration_minutes": duration,
-            "participants": random.randint(2, 20),
-            "status": random.choice(["已预定", "进行中", "已完成", "已取消"]),
-            "cost": random.randint(100, 1000),
-        })
+        meetings_data.append(
+            {
+                "meeting_id": i + 1,
+                "title": random.choice(topics),
+                "room_id": random.randint(1, 10),
+                "department": random.choice(departments),
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration_minutes": duration,
+                "participants": random.randint(2, 20),
+                "status": random.choice(["已预定", "进行中", "已完成", "已取消"]),
+                "cost": random.randint(100, 1000),
+            }
+        )
 
     users_data = []
     roles = ["会议组织者", "会议参与者", "系统管理员"]
 
     for i in range(30):
-        users_data.append({
-            "user_id": i + 1,
-            "username": fake.user_name(),
-            "name": fake.name(),
-            "role": random.choice(roles),
-            "department": random.choice(departments),
-            "email": fake.email(),
-            "join_date": fake.date_between(start_date="-365d", end_date="today"),
-        })
+        users_data.append(
+            {
+                "user_id": i + 1,
+                "username": fake.user_name(),
+                "name": fake.name(),
+                "role": random.choice(roles),
+                "department": random.choice(departments),
+                "email": fake.email(),
+                "join_date": fake.date_between(start_date="-365d", end_date="today"),
+            }
+        )
 
-    return pd.DataFrame(rooms_data), pd.DataFrame(meetings_data), pd.DataFrame(users_data)
+    return (
+        pd.DataFrame(rooms_data),
+        pd.DataFrame(meetings_data),
+        pd.DataFrame(users_data),
+    )
 
 
 def demo_pandasai_queries():
@@ -224,7 +245,9 @@ def demo_pandasai_queries():
                 st.error("无法创建 pandasAI Agent")
 
     st.markdown("### 🔍 自定义查询")
-    custom_query = st.text_area("输入您的查询需求", placeholder="例如：绘制会议时长分布图", height=100)
+    custom_query = st.text_area(
+        "输入您的查询需求", placeholder="例如：绘制会议时长分布图", height=100
+    )
 
     if st.button("🔍 执行自定义查询") and custom_query:
         llm = setup_pandasai()
@@ -240,19 +263,23 @@ def demo_pandasai_queries():
 
 
 def main():
-    st.set_page_config(page_title="pandasAI 智能查询演示", page_icon="🤖", layout="wide")
+    st.set_page_config(
+        page_title="pandasAI 智能查询演示", page_icon="🤖", layout="wide"
+    )
     st.title("🤖 pandasAI 智能查询演示")
     st.markdown("展示如何在智慧会议系统中使用 pandasAI 进行智能数据查询")
 
     demo_pandasai_queries()
 
     st.sidebar.markdown("### 📝 使用说明")
-    st.sidebar.markdown("""
+    st.sidebar.markdown(
+        """
     1. 确保设置了 `DASHSCOPE_API_KEY` 环境变量
     2. 选择查询示例或输入自定义查询
     3. 点击执行按钮开始查询
     4. 查看智能分析结果和图表
-    """)
+    """
+    )
 
 
 if __name__ == "__main__":
