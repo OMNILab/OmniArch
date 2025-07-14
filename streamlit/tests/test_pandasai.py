@@ -11,20 +11,18 @@ streamlit run tests/test_pandasai.py
 
 import sys
 import pandas as pd
-from pandasai import SmartDataframe
-from pandasai.config import Config
-from pandasai.llm.openai import OpenAI
+
+from pandasai import Agent
+import pandasai as pai
 import streamlit as st
 from faker import Faker
 import random
 import os
 from datetime import datetime, timedelta
-import openai
-from pandasai.connectors import PandasConnector  # <-- Add this import
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
 
-from modules.llm_dashscope import DashScopeOpenAI
+from modules.llm import DashScopeOpenAI
 from modules.plots import setup_matplotlib_fonts
 
 
@@ -47,20 +45,24 @@ def setup_pandasai():
         return None
 
 
-def create_smart_dataframe(df, llm):
-    """创建 SmartDataframe"""
+def create_pandasai_agent(df, llm):
     try:
-        config = Config(
-            llm=llm,
-            verbose=True,
-            enable_plotting=True,
-            save_charts=True,
-            save_charts_path="./charts",
+        pai.config.set(
+            {
+                "llm": llm,
+                "verbose": False,
+                "max_retries": 3,
+                "enforce_privacy": True,
+                "enable_logging": True,
+                "enable_plotting": True,
+                "save_charts": True,
+                "save_charts_path": "./charts",
+            }
         )
-        smart_df = SmartDataframe(df, config=config)
-        return smart_df
+        agent = Agent([pai.DataFrame(df)])
+        return agent
     except Exception as e:
-        st.error(f"创建 SmartDataframe 失败: {e}")
+        st.error(f"创建 pandasAI Agent 失败: {e}")
         return None
 
 
@@ -186,25 +188,16 @@ def demo_pandasai_queries():
         merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
 
         with st.spinner(f"正在执行智能查询..."):
-            # 执行查询
-            smart_df = create_smart_dataframe(merged_df, llm)
-            if smart_df is not None:
-                response = smart_df.chat(selected_query)
+            # 执行查询 - 使用 Agent 替代 SmartDataframe
+            agent = create_pandasai_agent(merged_df, llm)
+            if agent is not None:
+                response = agent.chat(selected_query)
                 st.success("查询完成！")
                 st.markdown("### 📈 查询结果")
 
-                # Handle different response types
+                # Handle different response types for pandasai 3.0
                 if isinstance(response, pd.DataFrame):
                     st.dataframe(response, use_container_width=True)
-                elif isinstance(response, PandasConnector) or "PandasConnector" in str(
-                    type(response)
-                ):
-                    try:
-                        df = response.to_dataframe()
-                        st.dataframe(df, use_container_width=True)
-                    except Exception as e:
-                        st.write(f"Error converting PandasConnector: {e}")
-                        st.write(str(response))
                 elif hasattr(response, "shape") and hasattr(response, "columns"):
                     st.dataframe(response, use_container_width=True)
                 elif isinstance(response, (str, int, float)):
@@ -212,7 +205,7 @@ def demo_pandasai_queries():
                 else:
                     st.write(str(response))
             else:
-                st.error("无法创建智能数据框")
+                st.error("无法创建 pandasAI Agent")
 
     # 自定义查询
     st.markdown("### 🔍 自定义查询")
@@ -230,24 +223,15 @@ def demo_pandasai_queries():
             merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
 
             with st.spinner("正在执行自定义查询..."):
-                smart_df = create_smart_dataframe(merged_df, llm)
-                if smart_df is not None:
-                    response = smart_df.chat(custom_query)
+                agent = create_pandasai_agent(merged_df, llm)
+                if agent is not None:
+                    response = agent.chat(custom_query)
                     st.success("查询完成！")
                     st.markdown("### 📈 查询结果")
 
-                    # Handle different response types
+                    # Handle different response types for pandasai 3.0
                     if isinstance(response, pd.DataFrame):
                         st.dataframe(response, use_container_width=True)
-                    elif isinstance(
-                        response, PandasConnector
-                    ) or "PandasConnector" in str(type(response)):
-                        try:
-                            df = response.to_dataframe()
-                            st.dataframe(df, use_container_width=True)
-                        except Exception as e:
-                            st.write(f"Error converting PandasConnector: {e}")
-                            st.write(str(response))
                     elif hasattr(response, "shape") and hasattr(response, "columns"):
                         st.dataframe(response, use_container_width=True)
                     elif isinstance(response, (str, int, float)):
@@ -255,161 +239,10 @@ def demo_pandasai_queries():
                     else:
                         st.write(str(response))
                 else:
-                    st.error("无法创建智能数据框")
+                    st.error("无法创建 pandasAI Agent")
 
         except Exception as e:
             st.error(f"查询执行失败: {e}")
-
-
-def show_advanced_analytics():
-    """显示高级分析功能"""
-
-    st.markdown("## 📊 高级数据分析")
-
-    # 生成数据
-    rooms_df, meetings_df, users_df = generate_demo_data()
-    merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
-
-    # 分析选项
-    analysis_type = st.selectbox(
-        "选择分析类型",
-        ["会议室使用效率分析", "部门会议模式分析", "成本效益分析", "时间趋势分析"],
-    )
-
-    if analysis_type == "会议室使用效率分析":
-        st.markdown("### 🏢 会议室使用效率分析")
-
-        # 计算使用效率指标
-        room_usage = (
-            merged_df.groupby("room_name")
-            .agg(
-                {
-                    "meeting_id": "count",
-                    "duration_minutes": "sum",
-                    "participants": "sum",
-                    "cost": "sum",
-                }
-            )
-            .reset_index()
-        )
-
-        room_usage.columns = [
-            "会议室",
-            "会议次数",
-            "总时长(分钟)",
-            "总参与人数",
-            "总成本",
-        ]
-        room_usage["平均时长"] = room_usage["总时长(分钟)"] / room_usage["会议次数"]
-        room_usage["平均参与人数"] = room_usage["总参与人数"] / room_usage["会议次数"]
-
-        st.dataframe(room_usage, use_container_width=True)
-
-        # 可视化
-        import plotly.express as px
-
-        fig = px.bar(room_usage, x="会议室", y="会议次数", title="会议室使用频率")
-        st.plotly_chart(fig, use_container_width=True)
-
-        fig2 = px.scatter(
-            room_usage,
-            x="平均时长",
-            y="平均参与人数",
-            size="会议次数",
-            hover_data=["会议室"],
-            title="会议室效率散点图",
-        )
-        st.plotly_chart(fig2, use_container_width=True)
-
-    elif analysis_type == "部门会议模式分析":
-        st.markdown("### 🏢 部门会议模式分析")
-
-        dept_analysis = (
-            merged_df.groupby("department")
-            .agg(
-                {
-                    "meeting_id": "count",
-                    "duration_minutes": ["mean", "sum"],
-                    "participants": "mean",
-                    "cost": "sum",
-                }
-            )
-            .reset_index()
-        )
-
-        dept_analysis.columns = [
-            "部门",
-            "会议次数",
-            "平均时长",
-            "总时长",
-            "平均参与人数",
-            "总成本",
-        ]
-
-        st.dataframe(dept_analysis, use_container_width=True)
-
-        # 可视化
-        import plotly.express as px
-
-        fig = px.pie(
-            dept_analysis, values="会议次数", names="部门", title="各部门会议数量分布"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    elif analysis_type == "成本效益分析":
-        st.markdown("### 💰 成本效益分析")
-
-        # 计算成本效益指标
-        cost_analysis = (
-            merged_df.groupby("room_name")
-            .agg({"cost": "sum", "duration_minutes": "sum", "participants": "sum"})
-            .reset_index()
-        )
-
-        cost_analysis["每分钟成本"] = (
-            cost_analysis["cost"] / cost_analysis["duration_minutes"]
-        )
-        cost_analysis["每人成本"] = (
-            cost_analysis["cost"] / cost_analysis["participants"]
-        )
-
-        st.dataframe(cost_analysis, use_container_width=True)
-
-        # 可视化
-        import plotly.express as px
-
-        fig = px.scatter(
-            cost_analysis,
-            x="每分钟成本",
-            y="每人成本",
-            size="cost",
-            hover_data=["room_name"],
-            title="会议室成本效益分析",
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    elif analysis_type == "时间趋势分析":
-        st.markdown("### 📈 时间趋势分析")
-
-        # 按时间统计
-        time_analysis = (
-            merged_df.groupby(merged_df["start_time"].dt.date)
-            .agg({"meeting_id": "count", "duration_minutes": "sum", "cost": "sum"})
-            .reset_index()
-        )
-
-        time_analysis.columns = ["日期", "会议次数", "总时长", "总成本"]
-
-        st.dataframe(time_analysis, use_container_width=True)
-
-        # 可视化
-        import plotly.express as px
-
-        fig = px.line(time_analysis, x="日期", y="会议次数", title="每日会议数量趋势")
-        st.plotly_chart(fig, use_container_width=True)
-
-        fig2 = px.line(time_analysis, x="日期", y="总成本", title="每日会议成本趋势")
-        st.plotly_chart(fig2, use_container_width=True)
 
 
 def main():
@@ -423,17 +256,8 @@ def main():
     st.title("🤖 pandasAI 智能查询演示")
     st.markdown("展示如何在智慧会议系统中使用 pandasAI 进行智能数据查询")
 
-    # 侧边栏
-    st.sidebar.title("功能选择")
-    demo_type = st.sidebar.selectbox("选择演示类型", ["智能查询演示", "高级数据分析"])
+    demo_pandasai_queries()
 
-    if demo_type == "智能查询演示":
-        demo_pandasai_queries()
-    else:
-        show_advanced_analytics()
-
-    # 底部信息
-    st.sidebar.markdown("---")
     st.sidebar.markdown("### 📝 使用说明")
     st.sidebar.markdown(
         """

@@ -1,4 +1,4 @@
-from pandasai.llm.openai import OpenAI
+from pandasai_openai import OpenAI
 import openai
 
 
