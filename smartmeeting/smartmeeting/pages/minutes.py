@@ -198,7 +198,7 @@ class MinutesPage:
 
             with col4:
                 # Pagination
-                items_per_page = 10
+                items_per_page = 5
                 # Apply filters first to get total items for pagination
                 filtered_df = minutes_df.copy()
 
@@ -276,58 +276,77 @@ class MinutesPage:
                     minute_id = str(raw_id) if pd.notna(raw_id) else f"nan_{idx}"
 
                     with st.expander(f"{title} - {status} ({display_time})"):
+                        # 上部内容：会议摘要、与会人员、决策事项、行动项
                         col1, col2 = st.columns(2)
+
                         with col1:
                             st.markdown("#### 会议摘要")
                             st.write(minute.get("summary", "(无摘要)"))
 
+                            # 显示与会人信息
+                            attendees = minute.get("attendees", "")
+                            if attendees:
+                                st.markdown("#### 与会人员")
+                                if isinstance(attendees, str):
+                                    # 如果是字符串，按分号分割
+                                    attendee_list = [
+                                        a.strip()
+                                        for a in attendees.split(";")
+                                        if a.strip()
+                                    ]
+                                    for attendee in attendee_list:
+                                        st.markdown(f"• {attendee}")
+                                elif isinstance(attendees, list):
+                                    # 如果是列表，直接显示
+                                    for attendee in attendees:
+                                        st.markdown(f"• {attendee}")
+
+                        with col2:
                             decisions = minute.get("decisions", [])
                             if decisions:
                                 st.markdown("#### 决策事项")
                                 for i, decision in enumerate(decisions, 1):
                                     st.markdown(f"{i}. {decision}")
 
-                        with col2:
                             action_items = minute.get("action_items", [])
                             if action_items:
                                 st.markdown("#### 行动项")
                                 for i, action in enumerate(action_items, 1):
                                     st.markdown(f"{i}. {action}")
 
-                            st.markdown("#### 操作")
-                            bcol1, bcol2, bcol3 = st.columns(3)
+                        # 分隔线
+                        st.markdown("---")
 
-                            with bcol1:
-                                if st.button("确认", key=f"confirm_{minute_id}_{idx}"):
-                                    actual_id = minute.get("id") or minute.get(
-                                        "minute_id"
+                        # 底部操作按钮
+                        bcol1, bcol2, bcol3 = st.columns(3)
+
+                        with bcol1:
+                            if st.button("确认", key=f"confirm_{minute_id}_{idx}"):
+                                actual_id = minute.get("id") or minute.get("minute_id")
+                                if actual_id and pd.notna(actual_id):
+                                    self.data_manager.update_minute_status(
+                                        actual_id, "已确认"
                                     )
-                                    if actual_id and pd.notna(actual_id):
-                                        self.data_manager.update_minute_status(
-                                            actual_id, "已确认"
-                                        )
-                                        st.success("纪要已确认")
-                                        st.rerun()
-                                    else:
-                                        st.error("无法更新纪要状态：ID无效")
+                                    st.success("纪要已确认")
+                                    st.rerun()
+                                else:
+                                    st.error("无法更新纪要状态：ID无效")
 
-                            with bcol2:
-                                if st.button("发布", key=f"publish_{minute_id}_{idx}"):
-                                    actual_id = minute.get("id") or minute.get(
-                                        "minute_id"
+                        with bcol2:
+                            if st.button("发布", key=f"publish_{minute_id}_{idx}"):
+                                actual_id = minute.get("id") or minute.get("minute_id")
+                                if actual_id and pd.notna(actual_id):
+                                    self.data_manager.update_minute_status(
+                                        actual_id, "已发布"
                                     )
-                                    if actual_id and pd.notna(actual_id):
-                                        self.data_manager.update_minute_status(
-                                            actual_id, "已发布"
-                                        )
-                                        st.success("纪要已发布")
-                                        st.rerun()
-                                    else:
-                                        st.error("无法更新纪要状态：ID无效")
+                                    st.success("纪要已发布")
+                                    st.rerun()
+                                else:
+                                    st.error("无法更新纪要状态：ID无效")
 
-                            with bcol3:
-                                if st.button("删除", key=f"delete_{minute_id}_{idx}"):
-                                    st.warning("删除功能暂未实现")
+                        with bcol3:
+                            if st.button("删除", key=f"delete_{minute_id}_{idx}"):
+                                st.warning("删除功能暂未实现")
             else:
                 st.info("没有找到符合条件的会议纪要")
         else:
