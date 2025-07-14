@@ -6,10 +6,12 @@ Contains the PandasAI demo page implementation for the smart meeting system
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from typing import Optional, Dict, Any, Callable
+import plotly.graph_objects as go
+from typing import Optional, Dict, Any, Callable, List
 from datetime import datetime
 import time
 import logging
+import re
 from smartmeeting.llm import setup_pandasai_llm, create_pandasai_agent
 
 # Configure logging
@@ -42,6 +44,10 @@ TEXTS = {
     "error_occurred": "❌ 分析过程中出现错误: {error}",
     "fallback_info": "创建基础可视化图表...",
     "no_visualizable_cols": "数据中没有可用的数值或分类字段来创建图表",
+    "plotly_chart_created": "📊 已生成交互式图表",
+    "analysis_insights": "#### 🔍 分析洞察",
+    "chart_generation_failed": "⚠️ 图表生成失败，显示基础统计信息",
+    "no_charts_generated": "⚠️ 未生成图表，使用备用可视化方案",
 }
 
 
@@ -62,11 +68,13 @@ class AnalysisPage:
         # Initialize session state
         if "analysis_running" not in st.session_state:
             st.session_state.analysis_running = False
+        if "last_charts" not in st.session_state:
+            st.session_state.last_charts = []
 
     def perform_ai_analysis(
         self, query: str, sample_data: pd.DataFrame, llm: Any
     ) -> Optional[str]:
-        """Perform AI-powered analysis using PandasAI with fallback to basic analysis.
+        """Perform AI-powered analysis using PandasAI with enhanced error handling and Plotly integration.
 
         Args:
             query: User query for analysis.
@@ -82,7 +90,7 @@ class AnalysisPage:
 
         try:
             if llm:
-                result = self._perform_pandasai_analysis(query, sample_data, llm)
+                result = self._perform_enhanced_pandasai_analysis(query, sample_data, llm)
                 if result:
                     return result
                 st.info("AI分析无结果，使用基础分析")
@@ -98,10 +106,10 @@ class AnalysisPage:
                 st.error(f"基础分析也失败: {fallback_error}")
                 return None
 
-    def _perform_pandasai_analysis(
+    def _perform_enhanced_pandasai_analysis(
         self, query: str, sample_data: pd.DataFrame, llm: Any
     ) -> Optional[str]:
-        """Perform intelligent analysis using PandasAI.
+        """Perform intelligent analysis using PandasAI with enhanced Plotly integration and error handling.
 
         Args:
             query: User query for analysis.
@@ -117,45 +125,68 @@ class AnalysisPage:
                 st.warning("AI智能体创建失败，使用基础分析")
                 return self._perform_basic_analysis(query, sample_data)
 
-            prompt = f"""请用中文分析以下数据：{query}
+            # Enhanced prompt with strict Plotly requirements
+            enhanced_prompt = f"""请用中文分析以下数据：{query}
 
-要求：
+严格要求：
 1. 分析结果必须用中文展示
-2. 提供简洁明了的洞察
-3. 生成1个最相关的plotly图表
-4. 图表标题和标签使用中文
-5. 返回plotly图表对象，不使用.show()或write_html()
-6. 示例：
-   import plotly.express as px
-   fig = px.bar(data, x='column', y='value', title='标题')
-   return fig"""
+2. 提供简洁明了的洞察和结论
+3. 必须生成1-2个最相关的plotly图表
+4. 图表标题、轴标签、图例必须使用中文
+5. 严格使用plotly.express或plotly.graph_objects创建图表
+6. 绝对不要使用matplotlib、seaborn或其他库
+7. 不要使用.show()、write_html()或save()方法
+8. 直接返回plotly图表对象
+9. 确保图表具有交互性和美观性
+
+数据列信息：
+{list(sample_data.columns)}
+
+示例代码格式：
+import plotly.express as px
+import plotly.graph_objects as go
+
+# 创建图表
+fig = px.bar(data, x='列名', y='列名', title='中文标题')
+fig.update_layout(
+    title_x=0.5,
+    font=dict(size=12),
+    showlegend=True
+)
+return fig
+
+请根据查询内容生成相应的分析结果和图表。"""
 
             start_time = time.time()
-            timeout = 60  # 60 seconds timeout
-            response = agent.chat(prompt)
+            timeout = 90  # 增加超时时间到90秒
+            
+            with st.spinner(TEXTS["ai_analyzing"]):
+                response = agent.chat(enhanced_prompt)
 
             if time.time() - start_time > timeout:
                 st.warning("AI分析超时，使用基础分析")
                 return self._perform_basic_analysis(query, sample_data)
 
-            charts_displayed = self._handle_pandasai_response(
+            # Enhanced response handling
+            charts_displayed = self._handle_enhanced_pandasai_response(
                 response, sample_data, query
             )
+            
             if not charts_displayed:
-                st.info("AI未生成图表，创建基础可视化")
-                self._create_fallback_charts(sample_data, query)
+                st.info(TEXTS["no_charts_generated"])
+                self._create_enhanced_fallback_charts(sample_data, query)
 
-            return str(response) if response else None
+            return self._extract_text_analysis(response) if response else None
 
         except Exception as e:
-            logger.warning(f"PandasAI analysis failed: {e}")
+            logger.warning(f"Enhanced PandasAI analysis failed: {e}")
             st.warning(f"AI分析失败，使用基础分析: {e}")
             return self._perform_basic_analysis(query, sample_data)
 
     def _perform_basic_analysis(
         self, query: str, sample_data: pd.DataFrame
     ) -> Optional[str]:
-        """Perform basic analysis when PandasAI is unavailable.
+        """Perform basic analysis when PandasAI is unavailable with enhanced Plotly integration.
 
         Args:
             query: User query for analysis.
@@ -165,27 +196,78 @@ class AnalysisPage:
             Analysis result as a string or None if analysis fails.
         """
         try:
+            # Create appropriate charts based on query
+            self._create_smart_fallback_chart(sample_data, query)
+            
             query_lower = query.lower()
             if any(k in query_lower for k in ["统计", "概览", "统计信息"]):
-                return self._generate_statistical_analysis(sample_data)
+                return self._generate_enhanced_statistical_analysis(sample_data)
             elif any(k in query_lower for k in ["图表", "可视化", "图形"]):
-                return self._generate_visualization_analysis(sample_data)
+                return self._generate_enhanced_visualization_analysis(sample_data)
             elif any(k in query_lower for k in ["趋势", "变化"]):
-                return self._generate_trend_analysis(sample_data)
+                return self._generate_enhanced_trend_analysis(sample_data)
             elif "分布" in query_lower:
-                return self._generate_distribution_analysis(sample_data)
+                return self._generate_enhanced_distribution_analysis(sample_data)
             elif any(k in query_lower for k in ["关联", "关系"]):
-                return self._generate_correlation_analysis(sample_data)
+                return self._generate_enhanced_correlation_analysis(sample_data)
             elif any(k in query_lower for k in ["效率", "性能"]):
-                return self._generate_efficiency_analysis(sample_data)
-            return self._generate_general_analysis(sample_data, query)
+                return self._generate_enhanced_efficiency_analysis(sample_data)
+            return self._generate_enhanced_general_analysis(sample_data, query)
         except Exception as e:
             logger.error(f"Basic analysis failed: {e}")
             st.error(f"基础分析失败: {e}")
             return None
 
+    def _generate_enhanced_statistical_analysis(self, data: pd.DataFrame) -> str:
+        """Generate enhanced statistical analysis in Chinese with better insights.
+
+        Args:
+            data: DataFrame to analyze.
+
+        Returns:
+            Enhanced statistical analysis as a markdown string.
+        """
+        analysis = "## 📊 数据统计分析\n\n"
+        analysis += f"- **总记录数**: {len(data):,}\n"
+        analysis += f"- **字段数**: {len(data.columns)}\n"
+        analysis += f"- **数据完整性**: {((data.count().sum() / (len(data) * len(data.columns))) * 100):.1f}%\n\n"
+
+        numeric_cols = data.select_dtypes(include=["number"]).columns
+        if numeric_cols.any():
+            analysis += "### 📈 数值型字段统计\n"
+            stats = data[numeric_cols].describe()
+            analysis += f"- **数值字段**: {', '.join(numeric_cols)}\n"
+            analysis += f"- **平均值范围**: {stats.loc['mean'].min():.2f} - {stats.loc['mean'].max():.2f}\n"
+            analysis += f"- **标准差范围**: {stats.loc['std'].min():.2f} - {stats.loc['std'].max():.2f}\n"
+            analysis += f"- **数据范围**: {stats.loc['min'].min():.2f} - {stats.loc['max'].max():.2f}\n\n"
+
+        categorical_cols = data.select_dtypes(include=["object"]).columns
+        if categorical_cols.any():
+            analysis += "### 📋 分类型字段统计\n"
+            for col in categorical_cols[:5]:  # Show more columns
+                unique_count = data[col].nunique()
+                null_count = data[col].isnull().sum()
+                analysis += f"- **{col}**: {unique_count} 个唯一值"
+                if null_count > 0:
+                    analysis += f" (缺失值: {null_count})"
+                analysis += "\n"
+
+        # Add data quality insights
+        analysis += "\n### 🔍 数据质量洞察\n"
+        total_cells = len(data) * len(data.columns)
+        missing_cells = data.isnull().sum().sum()
+        completeness = ((total_cells - missing_cells) / total_cells) * 100
+        analysis += f"- **数据完整性**: {completeness:.1f}%\n"
+        analysis += f"- **缺失值总数**: {missing_cells:,}\n"
+        
+        if missing_cells > 0:
+            missing_cols = data.columns[data.isnull().any()].tolist()
+            analysis += f"- **包含缺失值的字段**: {', '.join(missing_cols[:3])}\n"
+
+        return analysis
+
     def _generate_statistical_analysis(self, data: pd.DataFrame) -> str:
-        """Generate statistical analysis in Chinese.
+        """Generate statistical analysis in Chinese (legacy method for backward compatibility).
 
         Args:
             data: DataFrame to analyze.
@@ -193,29 +275,49 @@ class AnalysisPage:
         Returns:
             Statistical analysis as a markdown string.
         """
-        analysis = "## 📊 数据统计分析\n\n"
-        analysis += f"- **总记录数**: {len(data)}\n"
-        analysis += f"- **字段数**: {len(data.columns)}\n\n"
+        return self._generate_enhanced_statistical_analysis(data)
 
+    def _generate_enhanced_visualization_analysis(self, data: pd.DataFrame) -> str:
+        """Generate enhanced visualization analysis suggestions in Chinese.
+
+        Args:
+            data: DataFrame to analyze.
+
+        Returns:
+            Enhanced visualization suggestions as a markdown string.
+        """
+        analysis = "## 📈 数据可视化分析\n\n"
         numeric_cols = data.select_dtypes(include=["number"]).columns
-        if numeric_cols.any():
-            analysis += "### 数值型字段统计\n"
-            stats = data[numeric_cols].describe()
-            analysis += f"- 数值字段: {', '.join(numeric_cols)}\n"
-            analysis += f"- 平均值范围: {stats.loc['mean'].min():.2f} - {stats.loc['mean'].max():.2f}\n"
-            analysis += f"- 标准差范围: {stats.loc['std'].min():.2f} - {stats.loc['std'].max():.2f}\n\n"
-
         categorical_cols = data.select_dtypes(include=["object"]).columns
+
+        if numeric_cols.any():
+            analysis += "### 📊 数值型数据可视化建议\n"
+            analysis += "- **直方图**: 查看数值分布和集中趋势\n"
+            analysis += "- **箱线图**: 识别异常值和数据分布特征\n"
+            analysis += "- **密度图**: 了解数据分布形状\n"
+            if len(numeric_cols) >= 2:
+                analysis += "- **散点图**: 分析变量间的相关性\n"
+                analysis += "- **热力图**: 展示多变量相关性矩阵\n"
+
         if categorical_cols.any():
-            analysis += "### 分类型字段统计\n"
-            for col in categorical_cols[:3]:
-                unique_count = data[col].nunique()
-                analysis += f"- **{col}**: {unique_count} 个唯一值\n"
+            analysis += "\n### 📋 分类型数据可视化建议\n"
+            analysis += "- **柱状图**: 显示类别频次和排序\n"
+            analysis += "- **饼图**: 显示比例分布和占比\n"
+            analysis += "- **条形图**: 适合类别较多的数据\n"
+
+        # Add specific recommendations based on data content
+        analysis += "\n### 🎯 针对性建议\n"
+        if "时长" in data.columns or "duration" in data.columns:
+            analysis += "- **时长分析**: 建议使用直方图查看时长分布\n"
+        if "状态" in data.columns or "status" in data.columns:
+            analysis += "- **状态分析**: 建议使用饼图或柱状图查看状态分布\n"
+        if "时间" in data.columns or "date" in data.columns:
+            analysis += "- **时间分析**: 建议使用折线图查看趋势变化\n"
 
         return analysis
 
     def _generate_visualization_analysis(self, data: pd.DataFrame) -> str:
-        """Generate visualization analysis suggestions in Chinese.
+        """Generate visualization analysis suggestions in Chinese (legacy method for backward compatibility).
 
         Args:
             data: DataFrame to analyze.
@@ -223,26 +325,67 @@ class AnalysisPage:
         Returns:
             Visualization suggestions as a markdown string.
         """
-        analysis = "## 📈 数据可视化分析\n\n"
-        numeric_cols = data.select_dtypes(include=["number"]).columns
-        categorical_cols = data.select_dtypes(include=["object"]).columns
+        return self._generate_enhanced_visualization_analysis(data)
 
-        if numeric_cols.any():
-            analysis += "### 数值型数据可视化建议\n"
-            analysis += "- 直方图: 查看数值分布\n"
-            analysis += "- 箱线图: 识别异常值\n"
-            if len(numeric_cols) >= 2:
-                analysis += "- 散点图: 分析变量关系\n"
+    def _generate_enhanced_trend_analysis(self, data: pd.DataFrame) -> str:
+        """Generate enhanced trend analysis in Chinese.
 
-        if categorical_cols.any():
-            analysis += "\n### 分类型数据可视化建议\n"
-            analysis += "- 柱状图: 显示类别频次\n"
-            analysis += "- 饼图: 显示比例分布\n"
+        Args:
+            data: DataFrame to analyze.
 
+        Returns:
+            Enhanced trend analysis as a markdown string.
+        """
+        analysis = "## 📈 趋势分析\n\n"
+        time_columns = self._find_time_columns(data)
+        
+        if time_columns:
+            analysis += f"### 🕒 发现时间相关字段\n"
+            analysis += f"- **时间字段**: {', '.join(time_columns)}\n\n"
+            
+            # Analyze the first time column
+            time_col = time_columns[0]
+            try:
+                data[time_col] = pd.to_datetime(data[time_col], errors='coerce')
+                data_filtered = data.dropna(subset=[time_col])
+                
+                if not data_filtered.empty:
+                    # Calculate time range
+                    min_date = data_filtered[time_col].min()
+                    max_date = data_filtered[time_col].max()
+                    date_range = (max_date - min_date).days
+                    
+                    analysis += f"### 📅 时间范围分析\n"
+                    analysis += f"- **开始时间**: {min_date.strftime('%Y-%m-%d')}\n"
+                    analysis += f"- **结束时间**: {max_date.strftime('%Y-%m-%d')}\n"
+                    analysis += f"- **时间跨度**: {date_range} 天\n"
+                    
+                    # Monthly trend
+                    monthly_counts = data_filtered.groupby(data_filtered[time_col].dt.to_period('M')).size()
+                    analysis += f"- **月度记录数**: {monthly_counts.mean():.1f} 条/月\n"
+                    
+                    # Trend direction
+                    if len(monthly_counts) > 1:
+                        trend = "上升" if monthly_counts.iloc[-1] > monthly_counts.iloc[0] else "下降"
+                        analysis += f"- **整体趋势**: {trend}\n"
+                    
+                    analysis += "\n### 💡 趋势分析建议\n"
+                    analysis += "- 使用折线图查看时间序列变化\n"
+                    analysis += "- 分析季节性模式和周期性变化\n"
+                    analysis += "- 识别异常时间点和趋势转折点\n"
+                else:
+                    analysis += "⚠️ 时间数据格式异常，无法进行详细分析。\n"
+            except Exception as e:
+                analysis += f"⚠️ 时间数据处理失败: {str(e)}\n"
+        else:
+            analysis += "### ⚠️ 未发现时间字段\n"
+            analysis += "当前数据中没有明显的时间相关字段，无法进行趋势分析。\n"
+            analysis += "建议检查数据中是否包含日期、时间戳等时间信息。\n"
+            
         return analysis
 
     def _generate_trend_analysis(self, data: pd.DataFrame) -> str:
-        """Generate trend analysis in Chinese.
+        """Generate trend analysis in Chinese (legacy method for backward compatibility).
 
         Args:
             data: DataFrame to analyze.
@@ -250,24 +393,74 @@ class AnalysisPage:
         Returns:
             Trend analysis as a markdown string.
         """
-        analysis = "## 📈 趋势分析\n\n"
-        time_cols = self._find_time_columns(data)
+        return self._generate_enhanced_trend_analysis(data)
 
-        if time_cols:
-            analysis += f"发现时间相关字段: {', '.join(time_cols)}\n"
-            analysis += "建议进行时间序列分析:\n"
-            analysis += "- 时间趋势图\n"
-            analysis += "- 周期性分析\n"
-            analysis += "- 季节性模式识别\n"
-        else:
-            analysis += "未发现明显的时间字段，建议:\n"
-            analysis += "- 检查是否有日期/时间列\n"
-            analysis += "- 考虑添加时间维度进行分析\n"
+    def _generate_enhanced_distribution_analysis(self, data: pd.DataFrame) -> str:
+        """Generate enhanced distribution analysis in Chinese.
+
+        Args:
+            data: DataFrame to analyze.
+
+        Returns:
+            Enhanced distribution analysis as a markdown string.
+        """
+        analysis = "## 📊 分布分析\n\n"
+        numeric_cols = data.select_dtypes(include=["number"]).columns
+        categorical_cols = data.select_dtypes(include=["object"]).columns
+
+        if numeric_cols.any():
+            analysis += "### 📈 数值型数据分布\n"
+            for col in numeric_cols[:5]:  # Show more columns
+                stats = data[col].describe()
+                null_count = data[col].isnull().sum()
+                analysis += f"- **{col}**:\n"
+                analysis += f"  - 均值: {stats['mean']:.2f}\n"
+                analysis += f"  - 标准差: {stats['std']:.2f}\n"
+                analysis += f"  - 最小值: {stats['min']:.2f}\n"
+                analysis += f"  - 最大值: {stats['max']:.2f}\n"
+                if null_count > 0:
+                    analysis += f"  - 缺失值: {null_count}\n"
+                analysis += "\n"
+
+        if categorical_cols.any():
+            analysis += "### 📋 分类型数据分布\n"
+            for col in categorical_cols[:5]:  # Show more columns
+                value_counts = data[col].value_counts()
+                null_count = data[col].isnull().sum()
+                analysis += f"- **{col}**:\n"
+                analysis += f"  - 最多值: '{value_counts.index[0]}' ({value_counts.iloc[0]}次, {value_counts.iloc[0]/len(data)*100:.1f}%)\n"
+                analysis += f"  - 唯一值数量: {len(value_counts)}\n"
+                if null_count > 0:
+                    analysis += f"  - 缺失值: {null_count}\n"
+                analysis += "\n"
+
+        # Add distribution insights
+        analysis += "### 🔍 分布特征洞察\n"
+        if numeric_cols.any():
+            # Check for skewness
+            for col in numeric_cols[:3]:
+                skewness = data[col].skew()
+                if abs(skewness) > 1:
+                    skew_type = "右偏" if skewness > 0 else "左偏"
+                    analysis += f"- **{col}**: 分布{skew_type} (偏度: {skewness:.2f})\n"
+                else:
+                    analysis += f"- **{col}**: 分布相对对称 (偏度: {skewness:.2f})\n"
+
+        if categorical_cols.any():
+            # Check for balanced distribution
+            for col in categorical_cols[:3]:
+                value_counts = data[col].value_counts()
+                if len(value_counts) <= 5:  # Only for small number of categories
+                    max_ratio = value_counts.iloc[0] / value_counts.iloc[-1]
+                    if max_ratio > 5:
+                        analysis += f"- **{col}**: 分布不均衡，主要类别占比过高\n"
+                    else:
+                        analysis += f"- **{col}**: 分布相对均衡\n"
 
         return analysis
 
     def _generate_distribution_analysis(self, data: pd.DataFrame) -> str:
-        """Generate distribution analysis in Chinese.
+        """Generate distribution analysis in Chinese (legacy method for backward compatibility).
 
         Args:
             data: DataFrame to analyze.
@@ -275,26 +468,95 @@ class AnalysisPage:
         Returns:
             Distribution analysis as a markdown string.
         """
-        analysis = "## 📊 分布分析\n\n"
+        return self._generate_enhanced_distribution_analysis(data)
+
+    def _generate_enhanced_correlation_analysis(self, data: pd.DataFrame) -> str:
+        """Generate enhanced correlation analysis in Chinese.
+
+        Args:
+            data: DataFrame to analyze.
+
+        Returns:
+            Enhanced correlation analysis as a markdown string.
+        """
+        analysis = "## 🔗 关联关系分析\n\n"
         numeric_cols = data.select_dtypes(include=["number"]).columns
-        categorical_cols = data.select_dtypes(include=["object"]).columns
 
-        if numeric_cols.any():
-            analysis += "### 数值型数据分布\n"
-            for col in numeric_cols[:3]:
-                stats = data[col].describe()
-                analysis += f"- **{col}**: 均值={stats['mean']:.2f}, 标准差={stats['std']:.2f}\n"
+        if len(numeric_cols) >= 2:
+            # Create correlation matrix
+            corr_matrix = data[numeric_cols].corr()
+            
+            # Create heatmap using the new display method
+            fig = px.imshow(
+                corr_matrix,
+                title="数值字段相关性热力图",
+                color_continuous_scale="RdBu",
+                aspect="auto",
+                height=500,
+            )
+            fig.update_layout(
+                title_x=0.5,
+                font=dict(size=12),
+                showlegend=True
+            )
+            self._display_plotly_chart(fig, "相关性热力图")
 
-        if categorical_cols.any():
-            analysis += "\n### 分类型数据分布\n"
-            for col in categorical_cols[:3]:
-                value_counts = data[col].value_counts()
-                analysis += f"- **{col}**: 最多值='{value_counts.index[0]}' ({value_counts.iloc[0]}次)\n"
+            analysis += "### 📊 相关性分析结果\n"
+            analysis += f"- **分析字段**: {len(numeric_cols)} 个数值字段\n"
+            analysis += f"- **相关性矩阵**: {len(numeric_cols)}×{len(numeric_cols)} 矩阵\n\n"
+            
+            # Find strong correlations
+            strong_corr = []
+            moderate_corr = []
+            
+            for i in range(len(corr_matrix.columns)):
+                for j in range(i + 1, len(corr_matrix.columns)):
+                    corr_value = corr_matrix.iloc[i, j]
+                    var1, var2 = corr_matrix.columns[i], corr_matrix.columns[j]
+                    
+                    if abs(corr_value) > 0.7:
+                        strong_corr.append((var1, var2, corr_value))
+                    elif abs(corr_value) > 0.3:
+                        moderate_corr.append((var1, var2, corr_value))
+
+            if strong_corr:
+                analysis += "### 🔥 强相关性发现\n"
+                for var1, var2, corr in strong_corr:
+                    direction = "正相关" if corr > 0 else "负相关"
+                    analysis += f"- **{var1}** 与 **{var2}**: {corr:.3f} ({direction})\n"
+                analysis += "\n"
+
+            if moderate_corr:
+                analysis += "### 🔶 中等相关性发现\n"
+                for var1, var2, corr in moderate_corr[:5]:  # Limit to top 5
+                    direction = "正相关" if corr > 0 else "负相关"
+                    analysis += f"- **{var1}** 与 **{var2}**: {corr:.3f} ({direction})\n"
+                analysis += "\n"
+
+            if not strong_corr and not moderate_corr:
+                analysis += "### ℹ️ 相关性分析结果\n"
+                analysis += "- 未发现明显的相关性关系\n"
+                analysis += "- 各数值字段相对独立\n"
+
+            # Add insights
+            analysis += "### 💡 相关性分析洞察\n"
+            if strong_corr:
+                analysis += "- 存在强相关性，建议进一步分析因果关系\n"
+                analysis += "- 可考虑特征选择或降维处理\n"
+            elif moderate_corr:
+                analysis += "- 存在中等相关性，可进行分组分析\n"
+            else:
+                analysis += "- 字段间独立性较好，适合进行多变量分析\n"
+                
+        else:
+            analysis += "### ⚠️ 数值字段不足\n"
+            analysis += "当前数据中数值字段少于2个，无法进行相关性分析。\n"
+            analysis += "建议检查数据中是否包含足够的数值型字段。\n"
 
         return analysis
 
     def _generate_correlation_analysis(self, data: pd.DataFrame) -> str:
-        """Generate correlation analysis in Chinese.
+        """Generate correlation analysis in Chinese (legacy method for backward compatibility).
 
         Args:
             data: DataFrame to analyze.
@@ -302,40 +564,7 @@ class AnalysisPage:
         Returns:
             Correlation analysis as a markdown string.
         """
-        analysis = "## 🔗 关联关系分析\n\n"
-        numeric_cols = data.select_dtypes(include=["number"]).columns
-
-        if len(numeric_cols) >= 2:
-            corr_matrix = data[numeric_cols].corr()
-            fig = self._create_plotly_chart(
-                px.imshow,
-                corr_matrix,
-                title="数值字段相关性热力图",
-                color_continuous_scale="RdBu",
-                aspect="auto",
-                height=500,
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-            analysis += "### 相关性分析结果\n"
-            analysis += f"- 分析了 {len(numeric_cols)} 个数值字段之间的相关性\n"
-            strong_corr = [
-                (corr_matrix.columns[i], corr_matrix.columns[j], corr_matrix.iloc[i, j])
-                for i in range(len(corr_matrix.columns))
-                for j in range(i + 1, len(corr_matrix.columns))
-                if abs(corr_matrix.iloc[i, j]) > 0.7
-            ]
-
-            if strong_corr:
-                analysis += "- **强相关性发现**:\n"
-                for var1, var2, corr in strong_corr:
-                    analysis += f"  - {var1} 与 {var2}: {corr:.3f}\n"
-            else:
-                analysis += "- 未发现强相关性关系\n"
-        else:
-            analysis += "数值字段不足，无法进行相关性分析\n"
-
-        return analysis
+        return self._generate_enhanced_correlation_analysis(data)
 
     def _generate_efficiency_analysis(self, data: pd.DataFrame) -> str:
         """Generate efficiency analysis in Chinese.
@@ -1036,6 +1265,89 @@ class AnalysisPage:
             logger.error(f"Failed to create Plotly chart: {e}")
             st.warning(f"创建图表失败: {e}")
 
+    def _handle_enhanced_pandasai_response(
+        self, response: Any, sample_data: pd.DataFrame, query: str
+    ) -> bool:
+        """Enhanced handler for PandasAI response with better Plotly chart detection and display.
+
+        Args:
+            response: PandasAI response object.
+            sample_data: DataFrame analyzed.
+            query: User query.
+
+        Returns:
+            Boolean indicating if charts were displayed.
+        """
+        try:
+            charts_found = False
+            
+            # Clear previous charts
+            st.session_state.last_charts = []
+            
+            # Handle different response types
+            if isinstance(response, (go.Figure, dict)):
+                if isinstance(response, dict) and "data" in response:
+                    fig = go.Figure(response)
+                    self._display_plotly_chart(fig, "AI生成图表")
+                    charts_found = True
+                elif isinstance(response, go.Figure):
+                    self._display_plotly_chart(response, "AI生成图表")
+                    charts_found = True
+                    
+            elif isinstance(response, (list, tuple)):
+                for item in response:
+                    if isinstance(item, go.Figure):
+                        self._display_plotly_chart(item, "AI生成图表")
+                        charts_found = True
+                    elif isinstance(item, dict) and "data" in item:
+                        fig = go.Figure(item)
+                        self._display_plotly_chart(fig, "AI生成图表")
+                        charts_found = True
+                        
+            # Try to extract charts from string response
+            if not charts_found and isinstance(response, str):
+                charts_found = self._extract_charts_from_string(response, sample_data, query)
+                
+            if charts_found:
+                st.success(TEXTS["plotly_chart_created"])
+                
+            return charts_found
+            
+        except Exception as e:
+            logger.warning(f"Failed to handle enhanced PandasAI response: {e}")
+            st.warning(f"处理AI响应失败: {e}")
+            return False
+
+    def _extract_charts_from_string(self, response_str: str, sample_data: pd.DataFrame, query: str) -> bool:
+        """Extract and create charts from string response containing chart code.
+
+        Args:
+            response_str: String response that may contain chart code.
+            sample_data: DataFrame to use for chart creation.
+            query: User query.
+
+        Returns:
+            Boolean indicating if charts were created.
+        """
+        try:
+            # Look for plotly code patterns in the response
+            plotly_patterns = [
+                r'px\.(bar|line|scatter|histogram|box|violin|pie|area|heatmap)\([^)]+\)',
+                r'go\.(Figure|Scatter|Bar|Histogram|Box|Violin|Pie|Heatmap)\([^)]+\)',
+                r'fig\s*=\s*(px|go)\.[^)]+\)'
+            ]
+            
+            for pattern in plotly_patterns:
+                if re.search(pattern, response_str):
+                    # Create fallback chart based on query content
+                    return self._create_smart_fallback_chart(sample_data, query)
+                    
+            return False
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract charts from string: {e}")
+            return False
+
     def _handle_pandasai_response(
         self, response: Any, sample_data: pd.DataFrame, query: str
     ) -> bool:
@@ -1062,16 +1374,16 @@ class AnalysisPage:
                 return True
             else:
                 st.info("未检测到图表信息，创建基础可视化")
-                self._create_fallback_charts(sample_data, query)
+                self._create_enhanced_fallback_charts(sample_data, query)
                 return True
         except Exception as e:
             logger.warning(f"Failed to handle PandasAI response: {e}")
             st.warning(f"处理PandasAI响应失败: {e}")
-            self._create_fallback_charts(sample_data, query)
+            self._create_enhanced_fallback_charts(sample_data, query)
             return True
 
-    def _create_fallback_charts(self, sample_data: pd.DataFrame, query: str) -> None:
-        """Create fallback charts when AI analysis fails.
+    def _create_enhanced_fallback_charts(self, sample_data: pd.DataFrame, query: str) -> None:
+        """Create enhanced fallback charts with better error handling.
 
         Args:
             sample_data: DataFrame to visualize.
@@ -1079,106 +1391,282 @@ class AnalysisPage:
         """
         try:
             st.info(TEXTS["fallback_info"])
-            numeric_cols = sample_data.select_dtypes(include=["number"]).columns
-            categorical_cols = sample_data.select_dtypes(include=["object"]).columns
-
-            query_lower = query.lower()
-            if "时长" in query_lower or "duration" in query_lower:
-                if "时长" in sample_data.columns:
-                    self._create_plotly_chart(
-                        px.histogram,
-                        sample_data,
-                        x="时长",
-                        title="会议时长分布",
-                        labels={"时长": "时长（分钟）", "count": "会议数量"},
-                        nbins=20,
-                        color_discrete_sequence=["#1f77b4"],
-                    )
-                    st.plotly_chart(
-                        st.session_state.last_chart, use_container_width=True
-                    )
-                elif "duration_minutes" in sample_data.columns:
-                    self._create_plotly_chart(
-                        px.histogram,
-                        sample_data,
-                        x="duration_minutes",
-                        title="会议时长分布",
-                        labels={
-                            "duration_minutes": "时长（分钟）",
-                            "count": "会议数量",
-                        },
-                        nbins=20,
-                        color_discrete_sequence=["#1f77b4"],
-                    )
-                    st.plotly_chart(
-                        st.session_state.last_chart, use_container_width=True
-                    )
-                elif numeric_cols.any():
-                    self._create_plotly_chart(
-                        px.histogram,
-                        sample_data,
-                        x=numeric_cols[0],
-                        title=f"{numeric_cols[0]} 分布",
-                        nbins=20,
-                    )
-                    st.plotly_chart(
-                        st.session_state.last_chart, use_container_width=True
-                    )
-
-            elif "状态" in query_lower or "status" in query_lower:
-                if "状态" in sample_data.columns:
-                    status_counts = sample_data["状态"].value_counts()
-                    self._create_plotly_chart(
-                        px.pie,
-                        values=status_counts.values,
-                        names=status_counts.index,
-                        title="状态分布",
-                        color_discrete_sequence=px.colors.qualitative.Set3,
-                    )
-                    st.plotly_chart(
-                        st.session_state.last_chart, use_container_width=True
-                    )
-                elif categorical_cols.any():
-                    value_counts = sample_data[categorical_cols[0]].value_counts()
-                    self._create_plotly_chart(
-                        px.bar,
-                        x=value_counts.index,
-                        y=value_counts.values,
-                        title=f"{categorical_cols[0]} 分布",
-                        labels={"x": categorical_cols[0], "y": "数量"},
-                    )
-                    st.plotly_chart(
-                        st.session_state.last_chart, use_container_width=True
-                    )
+            
+            if self._create_smart_fallback_chart(sample_data, query):
+                st.success("已生成备用可视化图表")
             else:
-                if numeric_cols.any():
-                    self._create_plotly_chart(
-                        px.histogram,
-                        sample_data,
-                        x=numeric_cols[0],
-                        title=f"{numeric_cols[0]} 分布",
-                        nbins=20,
-                    )
-                    st.plotly_chart(
-                        st.session_state.last_chart, use_container_width=True
-                    )
-                elif categorical_cols.any():
-                    value_counts = sample_data[categorical_cols[0]].value_counts()
-                    self._create_plotly_chart(
-                        px.bar,
-                        x=value_counts.index,
-                        y=value_counts.values,
-                        title=f"{categorical_cols[0]} 分布",
-                        labels={"x": categorical_cols[0], "y": "数量"},
-                    )
-                    st.plotly_chart(
-                        st.session_state.last_chart, use_container_width=True
-                    )
-                else:
-                    st.warning(TEXTS["no_visualizable_cols"])
+                st.warning(TEXTS["no_visualizable_cols"])
+                
         except Exception as e:
-            logger.error(f"Failed to create fallback charts: {e}")
+            logger.error(f"Failed to create enhanced fallback charts: {e}")
             st.warning(f"创建备用图表失败: {e}")
+
+    def _create_fallback_charts(self, sample_data: pd.DataFrame, query: str) -> None:
+        """Create fallback charts when AI analysis fails (legacy method for backward compatibility).
+
+        Args:
+            sample_data: DataFrame to visualize.
+            query: User query.
+        """
+        self._create_enhanced_fallback_charts(sample_data, query)
+
+    def _create_smart_fallback_chart(self, sample_data: pd.DataFrame, query: str) -> bool:
+        """Create intelligent fallback charts based on query content and data structure.
+
+        Args:
+            sample_data: DataFrame to visualize.
+            query: User query.
+
+        Returns:
+            Boolean indicating if charts were created.
+        """
+        try:
+            query_lower = query.lower()
+            numeric_cols = sample_data.select_dtypes(include=["number"]).columns.tolist()
+            categorical_cols = sample_data.select_dtypes(include=["object"]).columns.tolist()
+            
+            charts_created = False
+            
+            # Duration analysis
+            if any(keyword in query_lower for keyword in ["时长", "duration", "时间", "time"]):
+                duration_cols = [col for col in sample_data.columns if any(word in col.lower() for word in ["时长", "duration", "时间", "time"])]
+                if duration_cols:
+                    self._create_duration_chart(sample_data, duration_cols[0])
+                    charts_created = True
+                elif numeric_cols:
+                    self._create_duration_chart(sample_data, numeric_cols[0])
+                    charts_created = True
+                    
+            # Status analysis
+            elif any(keyword in query_lower for keyword in ["状态", "status", "完成", "complete"]):
+                status_cols = [col for col in sample_data.columns if any(word in col.lower() for word in ["状态", "status", "完成", "complete"])]
+                if status_cols:
+                    self._create_status_chart(sample_data, status_cols[0])
+                    charts_created = True
+                elif categorical_cols:
+                    self._create_status_chart(sample_data, categorical_cols[0])
+                    charts_created = True
+                    
+            # Distribution analysis
+            elif any(keyword in query_lower for keyword in ["分布", "distribution", "统计", "statistics"]):
+                if numeric_cols:
+                    self._create_distribution_chart(sample_data, numeric_cols[0])
+                    charts_created = True
+                elif categorical_cols:
+                    self._create_distribution_chart(sample_data, categorical_cols[0])
+                    charts_created = True
+                    
+            # Trend analysis
+            elif any(keyword in query_lower for keyword in ["趋势", "trend", "变化", "change"]):
+                time_cols = self._find_time_columns(sample_data)
+                if time_cols:
+                    self._create_trend_chart(sample_data, time_cols[0])
+                    charts_created = True
+                    
+            # Default chart
+            if not charts_created:
+                if numeric_cols:
+                    self._create_distribution_chart(sample_data, numeric_cols[0])
+                    charts_created = True
+                elif categorical_cols:
+                    self._create_distribution_chart(sample_data, categorical_cols[0])
+                    charts_created = True
+                    
+            return charts_created
+            
+        except Exception as e:
+            logger.error(f"Failed to create smart fallback chart: {e}")
+            return False
+
+    def _create_duration_chart(self, data: pd.DataFrame, column: str) -> None:
+        """Create duration analysis chart.
+
+        Args:
+            data: DataFrame containing the data.
+            column: Column name for duration data.
+        """
+        try:
+            fig = px.histogram(
+                data, 
+                x=column, 
+                title=f"{column}分布分析",
+                labels={column: f"{column}（分钟）", "count": "频次"},
+                nbins=20,
+                color_discrete_sequence=["#1f77b4"]
+            )
+            fig.update_layout(
+                title_x=0.5,
+                font=dict(size=12),
+                showlegend=True,
+                height=400
+            )
+            self._display_plotly_chart(fig, f"{column}分布")
+        except Exception as e:
+            logger.error(f"Failed to create duration chart: {e}")
+
+    def _create_status_chart(self, data: pd.DataFrame, column: str) -> None:
+        """Create status analysis chart.
+
+        Args:
+            data: DataFrame containing the data.
+            column: Column name for status data.
+        """
+        try:
+            status_counts = data[column].value_counts()
+            fig = px.pie(
+                values=status_counts.values,
+                names=status_counts.index,
+                title=f"{column}分布分析",
+                color_discrete_sequence=px.colors.qualitative.Set3
+            )
+            fig.update_layout(
+                title_x=0.5,
+                font=dict(size=12),
+                height=400
+            )
+            self._display_plotly_chart(fig, f"{column}分布")
+        except Exception as e:
+            logger.error(f"Failed to create status chart: {e}")
+
+    def _create_distribution_chart(self, data: pd.DataFrame, column: str) -> None:
+        """Create distribution analysis chart.
+
+        Args:
+            data: DataFrame containing the data.
+            column: Column name for the data to analyze.
+        """
+        try:
+            if data[column].dtype in ['int64', 'float64']:
+                fig = px.histogram(
+                    data, 
+                    x=column, 
+                    title=f"{column}分布分析",
+                    nbins=20,
+                    color_discrete_sequence=["#1f77b4"]
+                )
+            else:
+                value_counts = data[column].value_counts()
+                fig = px.bar(
+                    x=value_counts.index,
+                    y=value_counts.values,
+                    title=f"{column}分布分析",
+                    labels={"x": column, "y": "数量"},
+                    color_discrete_sequence=["#1f77b4"]
+                )
+            
+            fig.update_layout(
+                title_x=0.5,
+                font=dict(size=12),
+                showlegend=True,
+                height=400
+            )
+            self._display_plotly_chart(fig, f"{column}分布")
+        except Exception as e:
+            logger.error(f"Failed to create distribution chart: {e}")
+
+    def _create_trend_chart(self, data: pd.DataFrame, column: str) -> None:
+        """Create trend analysis chart.
+
+        Args:
+            data: DataFrame containing the data.
+            column: Column name for time data.
+        """
+        try:
+            # Try to convert to datetime if possible
+            try:
+                data[column] = pd.to_datetime(data[column], errors='coerce')
+                data_filtered = data.dropna(subset=[column])
+                
+                if not data_filtered.empty:
+                    # Group by date and count
+                    daily_counts = data_filtered.groupby(data_filtered[column].dt.date).size().reset_index()
+                    daily_counts.columns = ['date', 'count']
+                    
+                    fig = px.line(
+                        daily_counts,
+                        x='date',
+                        y='count',
+                        title=f"{column}趋势分析",
+                        labels={"date": "日期", "count": "数量"},
+                        color_discrete_sequence=["#1f77b4"]
+                    )
+                    fig.update_layout(
+                        title_x=0.5,
+                        font=dict(size=12),
+                        showlegend=True,
+                        height=400
+                    )
+                    self._display_plotly_chart(fig, f"{column}趋势")
+                    return
+            except:
+                pass
+                
+            # Fallback to simple count
+            value_counts = data[column].value_counts().head(10)
+            fig = px.bar(
+                x=value_counts.index,
+                y=value_counts.values,
+                title=f"{column}分布分析",
+                labels={"x": column, "y": "数量"},
+                color_discrete_sequence=["#1f77b4"]
+            )
+            fig.update_layout(
+                title_x=0.5,
+                font=dict(size=12),
+                showlegend=True,
+                height=400
+            )
+            self._display_plotly_chart(fig, f"{column}分布")
+            
+        except Exception as e:
+            logger.error(f"Failed to create trend chart: {e}")
+
+    def _display_plotly_chart(self, fig: go.Figure, title: str) -> None:
+        """Display a Plotly chart with consistent styling.
+
+        Args:
+            fig: Plotly figure object.
+            title: Chart title.
+        """
+        try:
+            # Ensure consistent styling
+            fig.update_layout(
+                margin=dict(l=20, r=20, t=50, b=20),
+                showlegend=True,
+                font=dict(size=12),
+                title_x=0.5,
+                height=400
+            )
+            
+            # Store in session state
+            st.session_state.last_charts.append(fig)
+            
+            # Display the chart
+            st.plotly_chart(fig, use_container_width=True)
+            
+        except Exception as e:
+            logger.error(f"Failed to display Plotly chart: {e}")
+            st.warning(f"显示图表失败: {e}")
+
+    def _extract_text_analysis(self, response: Any) -> str:
+        """Extract text analysis from PandasAI response.
+
+        Args:
+            response: PandasAI response object.
+
+        Returns:
+            Extracted text analysis.
+        """
+        try:
+            if isinstance(response, str):
+                return response
+            elif hasattr(response, '__str__'):
+                return str(response)
+            else:
+                return "AI分析完成，请查看上方生成的图表。"
+        except Exception as e:
+            logger.error(f"Failed to extract text analysis: {e}")
+            return "AI分析完成，请查看上方生成的图表。"
 
     def _create_merged_dataset(
         self,
