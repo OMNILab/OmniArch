@@ -23,7 +23,7 @@ import os
 from datetime import datetime, timedelta
 from pandasai.core.response.chart import ChartResponse
 from matplotlib.figure import Figure as MatplotlibFigure
-
+from smartmeeting.llm import setup_pandasai_llm, create_pandasai_agent
 
 # Setup fonts
 from smartmeeting.plots import setup_matplotlib_fonts
@@ -32,41 +32,6 @@ setup_matplotlib_fonts()
 
 # 初始化 Faker
 fake = Faker("zh_CN")
-
-
-def setup_pandasai():
-    try:
-        from smartmeeting.llm import DashScopeOpenAI
-
-        llm = DashScopeOpenAI(
-            api_token=os.getenv("DASHSCOPE_API_KEY"), model="qwen-plus"
-        )
-        return llm
-    except Exception as e:
-        st.warning(f"pandasAI 设置失败: {e}")
-        return None
-
-
-def create_pandasai_agent(df, llm):
-    try:
-        pai.config.set(
-            {
-                "llm": llm,
-                "verbose": False,
-                "max_retries": 3,
-                "enforce_privacy": True,
-                "enable_logging": True,
-                "enable_plotting": True,
-                "save_charts": False,
-                "plotting_engine": "plotly",
-                "plotting_library": "plotly",
-            }
-        )
-        agent = Agent([pai.DataFrame(df)])
-        return agent
-    except Exception as e:
-        st.error(f"创建 pandasAI Agent 失败: {e}")
-        return None
 
 
 def render_pandasai_response(response, query: str = "") -> bool:
@@ -233,7 +198,7 @@ def demo_pandasai_queries():
     selected_query = st.selectbox("选择查询示例", query_examples)
 
     if st.button("🚀 执行智能查询"):
-        llm = setup_pandasai()
+        llm = setup_pandasai_llm()
         merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
         with st.spinner("正在执行智能查询..."):
             agent = create_pandasai_agent(merged_df, llm)
@@ -250,7 +215,7 @@ def demo_pandasai_queries():
     )
 
     if st.button("🔍 执行自定义查询") and custom_query:
-        llm = setup_pandasai()
+        llm = setup_pandasai_llm()
         merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
         with st.spinner("正在执行自定义查询..."):
             agent = create_pandasai_agent(merged_df, llm)

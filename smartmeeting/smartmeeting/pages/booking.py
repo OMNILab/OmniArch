@@ -114,8 +114,9 @@ class BookingPage:
                         st.success(f"已选择 {room['name']}")
                 with col2:
                     if st.button(f"详情", key=f"details_{room['id']}"):
+                        equipment_info = room.get("equipment", "设备信息未知")
                         st.info(
-                            f"会议室详情: {room['name']} - 容量{room['capacity']}人 - 设备: {room['equipment']}"
+                            f"会议室详情: {room['name']} - 容量{room['capacity']}人 - 设备: {equipment_info}"
                         )
 
         # Enhanced booking form with session state
@@ -232,7 +233,8 @@ class BookingPage:
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         st.write(f"**状态：** {meeting['status']}")
-                        st.write(f"**类型：** {meeting['type']}")
+                        meeting_type = meeting.get("type", "未知类型")
+                        st.write(f"**类型：** {meeting_type}")
                     with col2:
                         st.write(f"**参与人数：** {meeting['participants']}")
                         st.write(f"**时长：** {meeting['duration']}分钟")

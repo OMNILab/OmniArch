@@ -6,7 +6,6 @@ Loads mock data from CSV files with session state integration for the smart meet
 import pandas as pd
 import os
 from datetime import datetime, timedelta
-from faker import Faker
 import random
 import streamlit as st
 
@@ -14,10 +13,8 @@ import streamlit as st
 class DataManager:
     """Enhanced data manager that loads data from CSV files and manages session state"""
 
-    def __init__(self, use_csv=True):
-        self.fake = Faker("zh_CN")
-        self.use_csv = use_csv
-        self.csv_path = "streamlit/mock"
+    def __init__(self):
+        self.csv_path = os.path.join(os.path.dirname(__file__), "../mock")
         self._init_session_state()
 
     def _init_session_state(self):
@@ -26,10 +23,11 @@ class DataManager:
             st.session_state.mock_data = {}
 
             # Try to load from CSV first, fall back to generated data
-            if self.use_csv and self._csv_files_exist():
+            if self._csv_files_exist():
+                print("Loading data from CSV files")
                 self._load_from_csv()
             else:
-                self._generate_mock_data()
+                raise FileNotFoundError("CSV files not found")
 
     def _csv_files_exist(self):
         """Check if CSV files exist"""
@@ -92,6 +90,16 @@ class DataManager:
             minutes_df["updated_datetime"] = pd.to_datetime(
                 minutes_df["updated_datetime"]
             )
+
+            # Apply field mapping to CSV data before storing in session state
+            if (
+                "meeting_title" in minutes_df.columns
+                and "title" not in minutes_df.columns
+            ):
+                minutes_df["title"] = minutes_df["meeting_title"]
+            if "minute_id" in minutes_df.columns and "id" not in minutes_df.columns:
+                minutes_df["id"] = minutes_df["minute_id"]
+
             st.session_state.mock_data["minutes"] = minutes_df.to_dict("records")
 
             # Load tasks data
@@ -126,153 +134,7 @@ class DataManager:
             )
 
         except Exception as e:
-            print(f"Error loading CSV files: {e}")
-            print("Falling back to generated mock data...")
-            self._generate_mock_data()
-
-    def _generate_mock_data(self):
-        """Generate mock data (fallback method)"""
-        self._generate_users()
-        self._generate_rooms()
-        self._generate_meetings()
-        self._generate_tasks()
-        self._generate_minutes()
-
-    def _generate_users(self):
-        """Generate mock user data"""
-        users = []
-        departments = ["研发部", "测试部", "市场部", "产品部", "运营部"]
-        roles = ["会议组织者", "会议参与者", "系统管理员"]
-
-        for i in range(20):
-            user = {
-                "id": i + 1,
-                "user_id": i + 1,
-                "username": self.fake.user_name(),
-                "name": self.fake.name(),
-                "email": self.fake.email(),
-                "department": random.choice(departments),
-                "role": random.choice(roles),
-                "created_at": self.fake.date_time_this_year(),
-            }
-            users.append(user)
-
-        st.session_state.mock_data["users"] = users
-
-    def _generate_rooms(self):
-        """Generate mock room data"""
-        rooms = []
-        room_types = ["会议室", "培训室", "视频会议室", "小型会议室"]
-        floors = ["3楼", "4楼", "5楼", "6楼"]
-
-        for i in range(8):
-            room = {
-                "id": i + 1,
-                "room_id": i + 1,
-                "name": f"{random.choice(floors)}{chr(65 + i)}会议室",
-                "room_name": f"{random.choice(floors)}{chr(65 + i)}会议室",
-                "capacity": random.choice([6, 8, 12, 15, 20, 25, 30, 40]),
-                "type": random.choice(room_types),
-                "room_type": random.choice(room_types),
-                "equipment": random.choice(
-                    ["投影仪", "视频会议设备", "白板", "音响设备"]
-                ),
-                "floor": random.choice(floors),
-                "status": random.choice(["可用", "维护中", "已预订"]),
-            }
-            rooms.append(room)
-
-        st.session_state.mock_data["rooms"] = rooms
-
-    def _generate_meetings(self):
-        """Generate mock meeting data"""
-        meetings = []
-        meeting_types = ["项目讨论", "产品评审", "技术分享", "团队会议", "客户会议"]
-
-        for i in range(50):
-            start_time = self.fake.date_time_this_month()
-            duration = random.choice([30, 60, 90, 120, 180])
-
-            meeting = {
-                "id": i + 1,
-                "booking_id": i + 1,
-                "title": f"{random.choice(meeting_types)} - {self.fake.sentence(nb_words=3)}",
-                "meeting_title": f"{random.choice(meeting_types)} - {self.fake.sentence(nb_words=3)}",
-                "room_id": random.randint(1, 8),
-                "organizer_id": random.randint(1, 20),
-                "start_time": start_time,
-                "start_datetime": start_time,
-                "end_time": start_time + timedelta(minutes=duration),
-                "end_datetime": start_time + timedelta(minutes=duration),
-                "duration": duration,
-                "duration_minutes": duration,
-                "participants": random.randint(3, 15),
-                "participant_count": random.randint(3, 15),
-                "type": random.choice(meeting_types),
-                "meeting_type": random.choice(meeting_types),
-                "status": random.choice(["已确认", "待确认", "已取消"]),
-                "description": self.fake.text(max_nb_chars=200),
-            }
-            meetings.append(meeting)
-
-        st.session_state.mock_data["meetings"] = meetings
-
-    def _generate_tasks(self):
-        """Generate mock task data"""
-        tasks = []
-        task_types = ["准备材料", "跟进进度", "编写报告", "协调资源", "技术调研"]
-        priorities = ["高", "中", "低"]
-        statuses = ["草稿", "确认", "进行中", "完成"]
-
-        for i in range(30):
-            task = {
-                "id": i + 1,
-                "task_id": i + 1,
-                "title": f"{random.choice(task_types)} - {self.fake.sentence(nb_words=4)}",
-                "description": self.fake.text(max_nb_chars=150),
-                "assignee_id": random.randint(1, 20),
-                "department": random.choice(
-                    ["研发部", "测试部", "市场部", "产品部", "运营部"]
-                ),
-                "priority": random.choice(priorities),
-                "status": random.choice(statuses),
-                "deadline": self.fake.date_between(start_date="-30d", end_date="+30d"),
-                "created_at": self.fake.date_time_this_month(),
-                "meeting_id": random.randint(1, 50) if random.random() > 0.3 else None,
-            }
-            tasks.append(task)
-
-        st.session_state.mock_data["tasks"] = tasks
-
-    def _generate_minutes(self):
-        """Generate mock meeting minutes data"""
-        minutes = []
-
-        for i in range(25):
-            minute = {
-                "id": i + 1,
-                "minute_id": i + 1,
-                "meeting_id": i + 1,
-                "booking_id": i + 1,
-                "title": f"会议纪要 - {self.fake.sentence(nb_words=3)}",
-                "meeting_title": f"会议纪要 - {self.fake.sentence(nb_words=3)}",
-                "summary": self.fake.text(max_nb_chars=300),
-                "decisions": [
-                    self.fake.sentence() for _ in range(random.randint(2, 5))
-                ],
-                "action_items": [
-                    self.fake.sentence() for _ in range(random.randint(3, 8))
-                ],
-                "participants": [
-                    self.fake.name() for _ in range(random.randint(5, 12))
-                ],
-                "created_at": self.fake.date_time_this_month(),
-                "updated_at": self.fake.date_time_this_month(),
-                "status": random.choice(["草稿", "已确认", "已发布"]),
-            }
-            minutes.append(minute)
-
-        st.session_state.mock_data["minutes"] = minutes
+            raise Exception(f"Error loading CSV files: {e}") from e
 
     def get_data(self):
         """Get all mock data from session state"""
@@ -302,6 +164,12 @@ class DataManager:
                     and "participants" not in df.columns
                 ):
                     df["participants"] = df["participant_count"]
+                if "meeting_title" in df.columns and "title" not in df.columns:
+                    df["title"] = df["meeting_title"]
+                if "booking_id" in df.columns and "id" not in df.columns:
+                    df["id"] = df["booking_id"]
+                if "meeting_type" in df.columns and "type" not in df.columns:
+                    df["type"] = df["meeting_type"]
 
             elif data_type == "tasks":
                 datetime_cols = ["deadline", "created_datetime", "updated_datetime"]
@@ -327,6 +195,8 @@ class DataManager:
                         10: "财务部",
                     }
                     df["department"] = df["department_id"].map(dept_mapping)
+                if "task_id" in df.columns and "id" not in df.columns:
+                    df["id"] = df["task_id"]
 
             elif data_type == "minutes":
                 datetime_cols = ["created_datetime", "updated_datetime"]
@@ -343,6 +213,23 @@ class DataManager:
                     df["id"] = df["minute_id"]
                 if "booking_id" in df.columns and "meeting_id" not in df.columns:
                     df["meeting_id"] = df["booking_id"]
+                if "meeting_title" in df.columns and "title" not in df.columns:
+                    df["title"] = df["meeting_title"]
+
+                # Helper function to split by multiple delimiters
+                def split_by_delimiters(text):
+                    if not isinstance(text, str):
+                        return text
+                    # Split by Chinese semicolon (；), English semicolon (;), Chinese period (。), English period (.)
+                    import re
+
+                    return re.split(r"[；;。.]", text)
+
+                if "key_decisions" in df.columns and "decisions" not in df.columns:
+                    df["decisions"] = df["key_decisions"].apply(split_by_delimiters)
+                # Ensure action_items is a list (split by multiple delimiters if string)
+                if "action_items" in df.columns:
+                    df["action_items"] = df["action_items"].apply(split_by_delimiters)
 
             elif data_type == "users":
                 datetime_cols = ["created_date", "last_login"]
@@ -379,6 +266,8 @@ class DataManager:
                     df["name"] = df["room_name"]
                 if "room_type" in df.columns and "type" not in df.columns:
                     df["type"] = df["room_type"]
+                if "equipment_notes" in df.columns and "equipment" not in df.columns:
+                    df["equipment"] = df["equipment_notes"]
 
             return df
         return pd.DataFrame()
@@ -400,8 +289,11 @@ class DataManager:
     def add_minute(self, minute_data):
         """Add a new minute to session state"""
         minute_data["id"] = len(st.session_state.mock_data["minutes"]) + 1
+        minute_data["minute_id"] = minute_data["id"]
         minute_data["created_at"] = datetime.now()
         minute_data["updated_at"] = datetime.now()
+        minute_data["created_datetime"] = minute_data["created_at"]
+        minute_data["updated_datetime"] = minute_data["updated_at"]
         st.session_state.mock_data["minutes"].append(minute_data)
 
     def update_task_status(self, task_id, new_status):
@@ -453,7 +345,7 @@ class DataManager:
         """Reset all data to default mock state"""
         st.session_state.mock_data = {}
         # Try to load from CSV first, fall back to generated data
-        if self.use_csv and self._csv_files_exist():
+        if self._csv_files_exist():
             self._load_from_csv()
         else:
             self._generate_mock_data()

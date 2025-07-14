@@ -9,6 +9,7 @@ import plotly.express as px
 from datetime import datetime
 import os
 import sys
+from smartmeeting.llm import setup_pandasai_llm
 
 
 class AnalysisPage:
@@ -18,28 +19,6 @@ class AnalysisPage:
         self.data_manager = data_manager
         self.auth_manager = auth_manager
         self.ui = ui_components
-
-    def setup_dashscope_llm(self):
-        """Setup DashScope LLM for AI analysis"""
-        try:
-            from smartmeeting.llm import DashScopeOpenAI
-        except ImportError:
-            st.warning("DashScopeOpenAI not available. Using mock analysis.")
-            return None
-
-        try:
-            api_key = os.getenv("DASHSCOPE_API_KEY")
-            if not api_key:
-                st.warning(
-                    "DASHSCOPE_API_KEY environment variable not set. Using mock analysis."
-                )
-                return None
-
-            llm = DashScopeOpenAI(api_token=api_key, model="qwen-plus")
-            return llm
-        except Exception as e:
-            st.error(f"Failed to setup DashScope LLM: {e}")
-            return None
 
     def perform_ai_analysis(self, query, sample_data, llm):
         """Perform AI-powered analysis using DashScope"""
@@ -317,7 +296,7 @@ class AnalysisPage:
         st.markdown("### 数据分析工具")
 
         # Check if DashScope is available
-        llm = self.setup_dashscope_llm()
+        llm = setup_pandasai_llm()
         if llm:
             st.success("✅ DashScope AI 分析已启用")
         else:

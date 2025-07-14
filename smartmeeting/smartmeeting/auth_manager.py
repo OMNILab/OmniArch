@@ -1,6 +1,9 @@
 """
 Authentication Manager Module
 Handles user authentication and session management with enhanced session state
+
+⚠️  TEMPORARY TESTING MODE: Authentication is currently disabled for quick testing.
+    To re-enable authentication, uncomment the line in is_authenticated() method.
 """
 
 import streamlit as st
@@ -79,7 +82,27 @@ class AuthManager:
 
     def is_authenticated(self) -> bool:
         """Check if user is authenticated"""
-        return st.session_state.authenticated
+        # Temporarily disable authentication for testing
+        # TODO: Re-enable authentication by uncommenting the line below
+        # return st.session_state.authenticated
+
+        # Auto-authenticate with demo user for testing
+        if not st.session_state.authenticated:
+            # Set up demo user automatically
+            demo_user = {
+                "id": 1,
+                "username": "demo_user",
+                "name": "Demo User (测试用户)",
+                "email": "demo@company.com",
+                "department": "研发部",
+                "role": "会议组织者",
+                "created_at": "2024-01-01",
+                "last_login": "2024-01-01",
+            }
+            st.session_state.authenticated = True
+            st.session_state.current_user = demo_user
+
+        return True
 
     def get_current_user(self) -> Optional[Dict[str, Any]]:
         """Get current authenticated user data"""
