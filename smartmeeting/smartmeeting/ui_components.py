@@ -226,17 +226,24 @@ class UIComponents:
     @staticmethod
     def create_room_card(room_data: dict):
         """Create a room recommendation card"""
+        # Get values with fallbacks for missing keys
+        name = room_data.get("name", "Unknown Room")
+        capacity = room_data.get("capacity", "N/A")
+        equipment = room_data.get("equipment", "No equipment info")
+        floor = room_data.get("floor", "N/A")
+        status = room_data.get("status", "Unknown")
+
         st.markdown(
             f"""
         <div class="room-card">
-            <h4 style="margin: 0 0 0.5rem 0; color: #1f2937;">{room_data['name']}</h4>
+            <h4 style="margin: 0 0 0.5rem 0; color: #1f2937;">{name}</h4>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-size: 0.9rem; color: #6b7280;">容量: {room_data['capacity']}人</span>
-                <span style="font-size: 0.9rem; color: #6b7280;">{room_data['equipment']}</span>
+                <span style="font-size: 0.9rem; color: #6b7280;">容量: {capacity}人</span>
+                <span style="font-size: 0.9rem; color: #6b7280;">{equipment}</span>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.9rem; color: #6b7280;">{room_data['floor']}</span>
-                <span class="status-badge status-available">{room_data['status']}</span>
+                <span style="font-size: 0.9rem; color: #6b7280;">{floor}</span>
+                <span class="status-badge status-available">{status}</span>
             </div>
         </div>
         """,

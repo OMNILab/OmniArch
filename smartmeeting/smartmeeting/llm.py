@@ -1,8 +1,13 @@
 from pandasai_openai import OpenAI
 import openai
+import os
+import pandasai as pai
+from pandasai import Agent
+
+LLM_CHAT_MODEL = "qwen-plus"
 
 
-class DashScopeOpenAI(OpenAI):
+class PandasAILLMDashScope(OpenAI):
     """Custom OpenAI class for DashScope's Qwen models"""
 
     _supported_chat_models = [
@@ -18,7 +23,7 @@ class DashScopeOpenAI(OpenAI):
 
     def __init__(self, api_token: str, model: str = "qwen-plus", **kwargs):
         """
-        Initialize the DashScopeOpenAI class with DashScope's API base and Qwen model.
+        Initialize the PandasAILLMDashScope class with DashScope's API base and Qwen model.
 
         Args:
             api_token (str): DashScope API key.
@@ -58,3 +63,65 @@ class DashScopeOpenAI(OpenAI):
         except AttributeError:
             # For older versions, assume pre-1.0
             return False
+
+
+def setup_pandasai_llm():
+    """Setup DashScope LLM for AI analysis"""
+    try:
+        from smartmeeting.llm import PandasAILLMDashScope
+    except ImportError:
+        print("PandasAILLMDashScope not available. Using mock analysis.")
+        return None
+
+    try:
+        api_key = os.getenv("DASHSCOPE_API_KEY")
+        if not api_key:
+            print(
+                "DASHSCOPE_API_KEY environment variable not set. Using mock analysis."
+            )
+            return None
+
+        llm = PandasAILLMDashScope(api_token=api_key, model="qwen-plus")
+        return llm
+    except Exception as e:
+        print(f"Failed to setup DashScope LLM: {e}")
+        return None
+
+
+def create_pandasai_agent(df, llm):
+    try:
+        pai.config.set(
+            {
+                "llm": llm,
+                "verbose": True,
+                "max_retries": 2,
+                "enforce_privacy": True,
+                "enable_logging": True,
+                "enable_plotting": True,
+                "save_charts": False,
+                "plotting_engine": "plotly",
+                "plotting_library": "plotly",
+            }
+        )
+        agent = Agent([pai.DataFrame(df)])
+        return agent
+    except Exception as e:
+        print(f"Failed to create pandasAI Agent: {e}")
+        return None
+
+
+def setup_chat_llm():
+    """Setup Chat LLM for AI analysis"""
+    api_key = os.getenv("DASHSCOPE_API_KEY")
+    api_base = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    if not api_key or not api_base:
+        print("Environment variables not set!")
+        return None
+
+    # Initialize OpenAI client
+    try:
+        client = openai.OpenAI(api_key=api_key, base_url=api_base)
+        return client
+    except Exception as e:
+        print(f"Failed to initialize OpenAI client: {e}")
+        return None

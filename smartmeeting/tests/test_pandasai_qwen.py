@@ -3,17 +3,9 @@ Simple test to validate pandasai communication with DashScope models
 Tests the integration between pandasai and DashScope's Qwen models using a sample dataframe
 """
 
-import os
-import sys
 import pandas as pd
-
 import pandasai as pai
-from pandasai import Agent
-from pandasai.config import Config
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
-
-from smartmeeting.llm import DashScopeOpenAI
+from smartmeeting.llm import setup_pandasai_llm, create_pandasai_agent
 
 
 def test_dashscope_pandasai_integration():
@@ -40,23 +32,11 @@ def test_dashscope_pandasai_integration():
         print()
 
         # Initialize pandasai with DashScope
-        llm = DashScopeOpenAI(
-            api_token=os.getenv("DASHSCOPE_API_KEY"), model="qwen-plus"
-        )
+        llm = setup_pandasai_llm()
 
         print("✅ LLM initialized with DashScope")
 
-        # Create Agent (replacing SmartDataframe in pandasai 3.0)
-        pai.config.set(
-            {
-                "llm": llm,
-                "verbose": False,
-                "max_retries": 3,
-                "enforce_privacy": True,
-                "enable_logging": True,
-            }
-        )
-        agent = Agent([sample_data])
+        agent = create_pandasai_agent(sample_data, llm)
 
         print("✅ pandasAI Agent created successfully")
 

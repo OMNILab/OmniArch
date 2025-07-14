@@ -1,11 +1,11 @@
 department_id,department_name,department_name_en,building_id,floor_location,head_name,employee_count,description
-1,研发部,R&D Department,1,4,张伟,25,负责产品技术研发和创新
-2,测试部,QA Department,1,5,李明,15,负责产品质量保证和测试
-3,架构部,Architecture Department,1,6,王强,12,负责系统架构设计和技术规划
-4,产品部,Product Department,2,3,刘芳,18,负责产品需求分析和产品设计
-5,运营部,Operations Department,2,4,陈静,20,负责产品运营和用户增长
-6,设计部,Design Department,2,5,杨磊,10,负责UI/UX设计和视觉设计
-7,市场部,Marketing Department,3,2,赵敏,22,负责市场推广和品牌建设
-8,销售部,Sales Department,3,3,孙涛,28,负责销售业务和客户关系
-9,人事部,HR Department,2,2,周婷,8,负责人力资源管理和企业文化
-10,财务部,Finance Department,3,1,马超,12,负责财务管理和成本控制
+1,"研发部","R&D Department",1,4,"张伟",25,"负责产品技术研发和创新"
+2,"测试部","QA Department",1,5,"李明",15,"负责产品质量保证和测试"
+3,"架构部","Architecture Department",1,6,"王强",12,"负责系统架构设计和技术规划"
+4,"产品部","Product Department",2,3,"刘芳",18,"负责产品需求分析和产品设计"
+5,"运营部","Operations Department",2,4,"陈静",20,"负责产品运营和用户增长"
+6,"设计部","Design Department",2,5,"杨磊",10,"负责UI/UX设计和视觉设计"
+7,"市场部","Marketing Department",3,2,"赵敏",22,"负责市场推广和品牌建设"
+8,"销售部","Sales Department",3,3,"孙涛",28,"负责销售业务和客户关系"
+9,"人事部","HR Department",2,2,"周婷",8,"负责人力资源管理和企业文化"
+10,"财务部","Finance Department",3,1,"马超",12,"负责财务管理和成本控制"
