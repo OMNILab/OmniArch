@@ -19,17 +19,34 @@ class DashboardPage:
 
     def show(self):
         """Data dashboard page implementation with enhanced real-time data"""
-        self.ui.create_header("数据面板")
+        self.ui.create_header("会议统计")
 
+        # 日期选择器 - 实现联动功能
         col1, col2 = st.columns(2)
 
         with col1:
             start_date = st.date_input(
-                "开始日期", value=datetime.now() - timedelta(days=30)
+                "开始日期",
+                value=datetime.now().date() - timedelta(days=30),
+                max_value=datetime.now().date(),
+                key="start_date",
             )
 
         with col2:
-            end_date = st.date_input("结束日期", value=datetime.now())
+            # 结束日期不能小于开始日期
+            min_end_date = start_date if start_date else datetime.now().date()
+            end_date = st.date_input(
+                "结束日期",
+                value=datetime.now().date(),
+                min_value=min_end_date,
+                max_value=datetime.now().date(),
+                key="end_date",
+            )
+
+            # 验证日期范围
+            if start_date and end_date and end_date < start_date:
+                st.error("结束日期不能小于开始日期")
+                st.stop()
 
         # Enhanced overall overview with real data
         st.markdown("### 整体概览")
@@ -58,12 +75,6 @@ class DashboardPage:
                 "可用会议室", str(dashboard_data["available_rooms"])
             )
 
-        # Real-time data refresh
-        col1, col2 = st.columns([3, 1])
-        with col2:
-            if st.button("刷新数据", type="primary"):
-                st.rerun()
-
         # Enhanced room usage charts with real data
         st.markdown("---")
         st.markdown("### 会议室使用分析")
@@ -74,8 +85,6 @@ class DashboardPage:
         rooms_df = self.data_manager.get_dataframe("rooms")
 
         with col1:
-            st.markdown("#### 会议室使用频率")
-
             # Room usage analysis
             if len(meetings_df) > 0:
                 room_usage = (
@@ -108,8 +117,6 @@ class DashboardPage:
                 st.info("暂无会议数据")
 
         with col2:
-            st.markdown("#### 会议时长分布")
-
             if len(meetings_df) > 0:
                 duration_bins = [0, 30, 60, 90, 120, 150, 180]
                 duration_labels = [

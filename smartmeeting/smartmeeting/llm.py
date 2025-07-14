@@ -90,6 +90,21 @@ def setup_pandasai_llm():
 
 def create_pandasai_agent(df, llm):
     try:
+        # 创建自定义环境，避免IPython依赖
+        import pandas as pd
+        import plotly.express as px
+        import plotly.graph_objects as go
+        import numpy as np
+
+        custom_env = {
+            "pd": pd,
+            "px": px,
+            "go": go,
+            "np": np,
+            "DataFrame": pd.DataFrame,
+            "Series": pd.Series,
+        }
+
         pai.config.set(
             {
                 "llm": llm,
@@ -101,6 +116,15 @@ def create_pandasai_agent(df, llm):
                 "save_charts": False,
                 "plotting_engine": "plotly",
                 "plotting_library": "plotly",
+                "custom_whitelisted_dependencies": ["plotly", "pandas", "numpy"],
+                "disable_plotting": False,
+                "show_plot": False,  # Disable automatic plot display
+                "custom_environment": custom_env,
+                "code_execution_config": {
+                    "last_message_is_code": True,
+                    "work_dir": "./temp_analysis",
+                    "use_docker": False,
+                },
             }
         )
         agent = Agent([pai.DataFrame(df)])

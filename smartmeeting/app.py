@@ -59,8 +59,8 @@ def main():
         if st.button("📋 任务看板", use_container_width=True):
             st.session_state.current_page = "任务看板"
 
-        if st.button("📊 数据面板", use_container_width=True):
-            st.session_state.current_page = "数据面板"
+        if st.button("📊 会议统计", use_container_width=True):
+            st.session_state.current_page = "会议统计"
 
         if st.button("🤖 智能分析", use_container_width=True):
             st.session_state.current_page = "智能分析"
@@ -83,7 +83,7 @@ def main():
         pages.show_minutes_page()
     elif page == "任务看板":
         pages.show_tasks_page()
-    elif page == "数据面板":
+    elif page == "会议统计":
         pages.show_dashboard_page()
     elif page == "智能分析":
         pages.show_analysis_page()

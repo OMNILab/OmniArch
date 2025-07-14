@@ -25,7 +25,9 @@ class TasksPage:
         users_df = self.data_manager.get_dataframe("users")
         minutes_df = self.data_manager.get_dataframe("minutes")
 
-        col1, col2 = st.columns([3, 1])
+        # 将选择关联会议、选择部门、创建任务按钮放在同一行
+        col1, col2, col3 = st.columns([2, 2, 1])
+
         with col1:
             # Get unique meeting titles from minutes
             meeting_options = (
@@ -33,9 +35,14 @@ class TasksPage:
                 if len(minutes_df) > 0
                 else ["全部会议"]
             )
-            selected_meeting = st.selectbox("选择关联会议", meeting_options)
+            selected_meeting = st.selectbox("会议", meeting_options)
 
         with col2:
+            # Enhanced department filter - 提前显示部门选择
+            departments = ["全部"] + list(tasks_df["department"].unique())
+            selected_dept = st.selectbox("部门", departments, key="dept_filter")
+
+        with col3:
             st.markdown("")
             st.markdown("")
             if st.button("创建任务", type="primary", key="create_task_btn"):
@@ -151,91 +158,6 @@ class TasksPage:
                             st.session_state.show_task_dialog = False
                             st.session_state.task_form_data = {}
                             st.rerun()
-            col1, col2 = st.columns(2)
-
-            with col1:
-                task_title = st.text_input(
-                    "任务标题",
-                    placeholder="请输入任务标题",
-                    value=st.session_state.task_form_data.get("title", ""),
-                )
-                task_description = st.text_area(
-                    "任务描述",
-                    placeholder="请输入任务描述",
-                    value=st.session_state.task_form_data.get("description", ""),
-                )
-
-            with col2:
-                task_assignee = st.selectbox(
-                    "分配给",
-                    users_df["name"].tolist(),
-                    index=(
-                        users_df["name"]
-                        .tolist()
-                        .index(
-                            st.session_state.task_form_data.get(
-                                "assignee", users_df["name"].iloc[0]
-                            )
-                        )
-                        if st.session_state.task_form_data.get("assignee")
-                        in users_df["name"].tolist()
-                        else 0
-                    ),
-                )
-                task_priority = st.selectbox(
-                    "优先级",
-                    ["高", "中", "低"],
-                    index=["高", "中", "低"].index(
-                        st.session_state.task_form_data.get("priority", "中")
-                    ),
-                )
-                task_deadline = st.date_input(
-                    "截止日期",
-                    value=st.session_state.task_form_data.get(
-                        "deadline", datetime.now().date() + timedelta(days=7)
-                    ),
-                )
-
-            if st.form_submit_button("创建任务", type="primary"):
-                if task_title and task_description:
-                    assignee_id = users_df[users_df["name"] == task_assignee].iloc[0][
-                        "id"
-                    ]
-                    assignee_dept = users_df[users_df["name"] == task_assignee].iloc[0][
-                        "department"
-                    ]
-
-                    # Get minute_id for the selected meeting
-                    minute_id = None
-                    if selected_meeting != "全部会议":
-                        minute_id = (
-                            minutes_df[minutes_df["title"] == selected_meeting][
-                                "id"
-                            ].iloc[0]
-                            if len(minutes_df[minutes_df["title"] == selected_meeting])
-                            > 0
-                            else None
-                        )
-
-                    new_task = {
-                        "title": task_title,
-                        "description": task_description,
-                        "assignee_id": assignee_id,
-                        "department": assignee_dept,
-                        "priority": task_priority,
-                        "status": "草稿",
-                        "deadline": task_deadline,
-                        "minute_id": minute_id,
-                    }
-
-                    self.data_manager.add_task(new_task)
-                    st.success("任务创建成功！")
-
-                    # Clear form data
-                    st.session_state.task_form_data = {}
-                    st.rerun()
-                else:
-                    st.error("请填写完整信息")
 
         # Apply meeting filter
         if selected_meeting != "全部会议":
@@ -254,16 +176,14 @@ class TasksPage:
         else:
             filtered_tasks = tasks_df
 
-        # Enhanced department filter
-        departments = ["全部"] + list(filtered_tasks["department"].unique())
-        selected_dept = st.selectbox("选择部门", departments, key="dept_filter")
-
+        # Apply department filter
         if selected_dept != "全部":
             filtered_tasks = filtered_tasks[
                 filtered_tasks["department"] == selected_dept
             ]
 
         # Enhanced task statistics chart
+        st.markdown("---")
         st.markdown("### 任务统计")
 
         col1, col2 = st.columns(2)
@@ -313,7 +233,7 @@ class TasksPage:
 
         # Interactive Gantt chart task board
         st.markdown("---")
-        st.markdown("#### 任务甘特图")
+        st.markdown("### 任务进展")
 
         # Create Gantt chart data
         if len(filtered_tasks) > 0:
@@ -356,7 +276,7 @@ class TasksPage:
                 y="Task",
                 color="Status",
                 hover_data=["Assignee", "Priority", "Status"],
-                title="任务甘特图",
+                title="",
                 color_discrete_map={
                     "草稿": "#FF6B6B",
                     "确认": "#4ECDC4",
@@ -397,7 +317,8 @@ class TasksPage:
             st.plotly_chart(fig, use_container_width=True, height=400)
 
             # Task details table below Gantt chart
-            st.markdown("#### 任务详情")
+            st.markdown("---")
+            st.markdown("### 任务列表")
 
             # Create a compact table view
             display_data = []
@@ -427,6 +348,6 @@ class TasksPage:
                 )
 
             display_df = pd.DataFrame(display_data)
-            st.dataframe(display_df, use_container_width=True, height=200)
+            st.dataframe(display_df, use_container_width=True, height=300)
         else:
             st.info("没有找到符合条件的任务")
