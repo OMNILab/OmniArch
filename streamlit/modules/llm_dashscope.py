@@ -9,7 +9,11 @@ class DashScopeOpenAI(OpenAI):
         "qwen-plus",
         "qwen-turbo",
         "qwen-max",
-        # Add other Qwen models as needed from DashScope documentation
+        "qwen3-235b-a22b",
+        "qwen3-30b-a3b",
+        "qwen3-32b",
+        "qwen-turbo-2025-04-28",
+        "qwen-plus-2025-04-28",
     ]
 
     def __init__(self, api_token: str, model: str = "qwen-plus", **kwargs):

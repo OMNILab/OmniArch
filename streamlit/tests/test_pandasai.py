@@ -25,7 +25,7 @@ from pandasai.connectors import PandasConnector  # <-- Add this import
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
 
 from modules.llm_dashscope import DashScopeOpenAI
-from modules.utils import setup_matplotlib_fonts
+from modules.plots import setup_matplotlib_fonts
 
 
 # Setup fonts
