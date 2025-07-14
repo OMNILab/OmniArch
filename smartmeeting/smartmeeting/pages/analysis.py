@@ -655,8 +655,223 @@ return fig
 
         return analysis
 
+    def _generate_enhanced_efficiency_analysis(self, data: pd.DataFrame) -> str:
+        """Generate enhanced efficiency analysis in Chinese.
+
+        Args:
+            data: DataFrame to analyze.
+
+        Returns:
+            Enhanced efficiency analysis as a markdown string.
+        """
+        analysis = "## ⚡ 效率性能分析\n\n"
+
+        if "数据源" in data.columns:
+            source_counts = data["数据源"].value_counts()
+            
+            # Create chart using new display method
+            fig = px.bar(
+                x=source_counts.index,
+                y=source_counts.values,
+                title="各数据源记录分布",
+                labels={"x": "数据源", "y": "记录数"},
+                color=source_counts.values,
+                color_continuous_scale="viridis",
+                height=400,
+            )
+            fig.update_layout(
+                title_x=0.5,
+                font=dict(size=12),
+                showlegend=True
+            )
+            self._display_plotly_chart(fig, "数据源分布")
+
+            analysis += "### 📊 数据源效率分析\n"
+            analysis += f"- **总记录数**: {len(data):,}\n"
+            analysis += f"- **数据源数量**: {len(source_counts)}\n\n"
+            
+            for source, count in source_counts.items():
+                percentage = (count / len(data)) * 100
+                analysis += f"- **{source}**: {count:,} 条记录 ({percentage:.1f}%)\n"
+            
+            # Efficiency insights
+            analysis += "\n### 💡 效率洞察\n"
+            max_source = source_counts.index[0]
+            max_count = source_counts.iloc[0]
+            max_percentage = (max_count / len(data)) * 100
+            
+            if max_percentage > 50:
+                analysis += f"- **主要数据源**: {max_source} 占主导地位 ({max_percentage:.1f}%)\n"
+                analysis += "- 建议平衡各数据源的使用\n"
+            else:
+                analysis += "- 数据源分布相对均衡\n"
+                analysis += "- 各数据源使用效率良好\n"
+
+        elif "时长" in data.columns:
+            duration_stats = data["时长"].describe()
+            
+            # Create chart using new display method
+            fig = px.histogram(
+                data,
+                x="时长",
+                title="会议时长分布",
+                nbins=20,
+                color_discrete_sequence=["#1f77b4"],
+                height=400,
+            )
+            fig.update_layout(
+                title_x=0.5,
+                font=dict(size=12),
+                showlegend=True
+            )
+            self._display_plotly_chart(fig, "时长分布")
+
+            analysis += "### ⏱️ 会议时长效率分析\n"
+            analysis += f"- **平均时长**: {duration_stats['mean']:.1f} 分钟\n"
+            analysis += f"- **最短时长**: {duration_stats['min']:.1f} 分钟\n"
+            analysis += f"- **最长时长**: {duration_stats['max']:.1f} 分钟\n"
+            analysis += f"- **时长标准差**: {duration_stats['std']:.1f} 分钟\n"
+            analysis += f"- **中位数**: {duration_stats['50%']:.1f} 分钟\n"
+            
+            # Efficiency assessment
+            analysis += "\n### 🎯 效率评估\n"
+            if duration_stats["mean"] > 90:
+                analysis += "- **效率状态**: 需要改进 (平均时长过长)\n"
+                analysis += "- **建议**: 优化会议流程，设置时间限制\n"
+            elif duration_stats["mean"] > 60:
+                analysis += "- **效率状态**: 一般 (时长偏长)\n"
+                analysis += "- **建议**: 提高会议效率，减少不必要的讨论\n"
+            else:
+                analysis += "- **效率状态**: 良好 (时长合理)\n"
+                analysis += "- **建议**: 保持当前效率水平\n"
+
+        elif "状态" in data.columns:
+            status_counts = data["状态"].value_counts()
+            
+            # Create chart using new display method
+            fig = px.pie(
+                values=status_counts.values,
+                names=status_counts.index,
+                title="任务状态分布",
+                color_discrete_sequence=px.colors.qualitative.Set3,
+                height=400,
+            )
+            fig.update_layout(
+                title_x=0.5,
+                font=dict(size=12)
+            )
+            self._display_plotly_chart(fig, "状态分布")
+
+            total_tasks = len(data)
+            completed_tasks = status_counts.get("完成", 0)
+            completion_rate = (
+                (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
+            )
+            
+            analysis += "### ✅ 任务完成效率分析\n"
+            analysis += f"- **总任务数**: {total_tasks:,}\n"
+            analysis += f"- **已完成任务**: {completed_tasks:,}\n"
+            analysis += f"- **完成率**: {completion_rate:.1f}%\n"
+            analysis += f"- **进行中任务**: {status_counts.get('进行中', 0):,}\n"
+            analysis += f"- **待处理任务**: {status_counts.get('待处理', 0):,}\n"
+            
+            # Efficiency assessment
+            analysis += "\n### 🎯 效率评估\n"
+            if completion_rate >= 80:
+                analysis += "- **效率状态**: 优秀 (完成率很高)\n"
+                analysis += "- **建议**: 继续保持高效的工作流程\n"
+            elif completion_rate >= 60:
+                analysis += "- **效率状态**: 良好 (完成率较高)\n"
+                analysis += "- **建议**: 优化任务分配和跟踪机制\n"
+            else:
+                analysis += "- **效率状态**: 需要改进 (完成率偏低)\n"
+                analysis += "- **建议**: 加强任务管理，提高执行效率\n"
+
+        else:
+            # Generic efficiency analysis
+            analysis += "### 📊 通用效率分析\n"
+            analysis += f"- **数据规模**: {len(data):,} 条记录\n"
+            analysis += f"- **数据完整性**: {((data.count().sum() / (len(data) * len(data.columns))) * 100):.1f}%\n"
+            
+            numeric_cols = data.select_dtypes(include=["number"]).columns
+            if numeric_cols.any():
+                analysis += f"- **数值字段**: {len(numeric_cols)} 个\n"
+                # Calculate overall efficiency score
+                efficiency_score = min(100, (len(data) / 1000) * 50 + (len(numeric_cols) / 5) * 50)
+                analysis += f"- **效率评分**: {efficiency_score:.1f}/100\n"
+
+        return analysis
+
+    def _generate_enhanced_general_analysis(self, data: pd.DataFrame, query: str) -> str:
+        """Generate enhanced general analysis based on query.
+
+        Args:
+            data: DataFrame to analyze.
+            query: User query for analysis.
+
+        Returns:
+            Enhanced general analysis as a markdown string.
+        """
+        analysis = f"## 🔍 智能分析结果\n\n针对查询: **{query}**\n\n"
+        analysis += "### 📊 数据概览\n"
+        analysis += f"- **数据集规模**: {len(data):,} 条记录\n"
+        analysis += f"- **字段数量**: {len(data.columns)} 个字段\n"
+        analysis += f"- **数据完整性**: {((data.count().sum() / (len(data) * len(data.columns))) * 100):.1f}%\n"
+
+        numeric_cols = data.select_dtypes(include=["number"]).columns
+        categorical_cols = data.select_dtypes(include=["object"]).columns
+
+        if numeric_cols.any():
+            analysis += f"- **数值型字段**: {len(numeric_cols)} 个\n"
+            analysis += f"- **分类型字段**: {len(categorical_cols)} 个\n\n"
+            
+            # Create visualizations using new display method
+            for col in numeric_cols[:2]:
+                fig = px.histogram(
+                    data, 
+                    x=col, 
+                    title=f"{col} 分布分析",
+                    nbins=20,
+                    color_discrete_sequence=["#1f77b4"]
+                )
+                fig.update_layout(
+                    title_x=0.5,
+                    font=dict(size=12),
+                    showlegend=True,
+                    height=400
+                )
+                self._display_plotly_chart(fig, f"{col}分布")
+
+        if categorical_cols.any():
+            for col in categorical_cols[:2]:
+                value_counts = data[col].value_counts()
+                fig = px.bar(
+                    x=value_counts.index,
+                    y=value_counts.values,
+                    title=f"{col} 分布分析",
+                    labels={"x": col, "y": "数量"},
+                    color=value_counts.values,
+                    color_continuous_scale="viridis",
+                )
+                fig.update_layout(
+                    title_x=0.5,
+                    font=dict(size=12),
+                    showlegend=True,
+                    height=400
+                )
+                self._display_plotly_chart(fig, f"{col}分布")
+
+        analysis += "\n### 💡 分析建议\n"
+        analysis += "- **统计信息**: 使用'统计'、'概览'等关键词获取详细统计\n"
+        analysis += "- **分布分析**: 使用'分布'、'统计'等关键词查看数据分布\n"
+        analysis += "- **效率分析**: 使用'效率'、'性能'等关键词进行效率评估\n"
+        analysis += "- **趋势分析**: 使用'趋势'、'变化'等关键词查看时间趋势\n"
+        analysis += "- **关联分析**: 使用'关联'、'关系'等关键词分析变量关系\n"
+
+        return analysis
+
     def _generate_general_analysis(self, data: pd.DataFrame, query: str) -> str:
-        """Generate general analysis based on query.
+        """Generate general analysis based on query (legacy method for backward compatibility).
 
         Args:
             data: DataFrame to analyze.
@@ -665,54 +880,14 @@ return fig
         Returns:
             General analysis as a markdown string.
         """
-        analysis = f"### 🤖 AI 分析结果\n\n针对查询: **{query}**\n\n"
-        analysis += "### 数据洞察\n"
-        analysis += f"- 数据集包含 {len(data)} 条记录\n"
-        analysis += f"- 涵盖 {len(data.columns)} 个字段\n"
-
-        numeric_cols = data.select_dtypes(include=["number"]).columns
-        if numeric_cols.any():
-            analysis += f"- 包含 {len(numeric_cols)} 个数值型字段\n"
-            st.markdown("#### 📊 数值字段分布")
-            for col in numeric_cols[:2]:
-                fig = self._create_plotly_chart(
-                    px.histogram, data, x=col, title=f"{col} 分布", nbins=20
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
-        categorical_cols = data.select_dtypes(include=["object"]).columns
-        if categorical_cols.any():
-            analysis += f"- 包含 {len(categorical_cols)} 个分类型字段\n"
-            st.markdown("#### 📈 分类字段分布")
-            for col in categorical_cols[:2]:
-                value_counts = data[col].value_counts()
-                fig = self._create_plotly_chart(
-                    px.bar,
-                    x=value_counts.index,
-                    y=value_counts.values,
-                    title=f"{col} 分布",
-                    labels={"x": col, "y": "数量"},
-                    color=value_counts.values,
-                    color_continuous_scale="viridis",
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
-        analysis += "\n### 建议\n"
-        analysis += "- 尝试更具体的查询，如'显示统计信息'或'生成图表'\n"
-        analysis += "- 使用内置查询获取常用分析结果\n"
-
-        return analysis
+        return self._generate_enhanced_general_analysis(data, query)
 
     def show(self) -> None:
         """Display the main analysis page."""
         self.ui.create_header(TEXTS["header"])
-        llm = setup_pandasai_llm()
-
-        if llm:
-            st.success(TEXTS["ai_enabled"])
-        else:
-            st.error(TEXTS["ai_init_failed"])
-            return
+        
+        # Hide PandasAI initialization from user
+        llm = setup_pandasai_llm()  # Still initialize for potential future use
 
         data_sources = ["会议数据", "任务数据", "用户数据", "会议室数据", "全部数据"]
         selected_source = st.selectbox("选择数据源", data_sources, index=0)
@@ -798,14 +973,16 @@ return fig
 
         Args:
             sample_data: DataFrame to analyze.
-            llm: Initialized LLM instance.
+            llm: Initialized LLM instance (hidden from user).
             selected_source: Selected data source.
         """
         st.markdown(TEXTS["analysis_query"])
         query = self._get_user_query(selected_source)
 
-        if st.button(TEXTS["start_analysis"], type="primary", use_container_width=True):
-            self._execute_analysis(query, sample_data, llm)
+        if query and query != TEXTS["select_query"]:
+            if st.button(TEXTS["start_analysis"], type="primary", use_container_width=True):
+                # Always use basic analysis, hide PandasAI from user
+                self._execute_basic_analysis_only(query, sample_data)
 
     def _get_user_query(self, selected_source: str) -> str:
         """Get user query from built-in or custom input.
@@ -847,15 +1024,14 @@ return fig
 
         return query
 
-    def _execute_analysis(
-        self, query: str, sample_data: pd.DataFrame, llm: Any
+    def _execute_basic_analysis_only(
+        self, query: str, sample_data: pd.DataFrame
     ) -> None:
-        """Execute analysis with progress indicators.
+        """Execute basic analysis only, hiding PandasAI from user interface.
 
         Args:
             query: User query for analysis.
             sample_data: DataFrame to analyze.
-            llm: Initialized LLM instance.
         """
         if not query:
             st.warning(TEXTS["no_query"])
@@ -870,37 +1046,46 @@ return fig
         status_text = st.empty()
 
         try:
-            status_text.text(TEXTS["ai_analyzing"])
+            status_text.text("🔍 正在分析数据...")
             progress_bar.progress(25)
 
-            if llm:
-                status_text.text(TEXTS["ai_executing"])
-                progress_bar.progress(50)
-                analysis_result = self.perform_ai_analysis(query, sample_data, llm)
-                progress_bar.progress(75)
-                status_text.text(TEXTS["generating_visuals"])
-
-                if analysis_result:
-                    progress_bar.progress(100)
-                    status_text.text(TEXTS["analysis_complete"])
-                    progress_bar.empty()
-                    status_text.empty()
-                    st.success(TEXTS["analysis_complete"])
-                    self._display_analysis_results(analysis_result, sample_data, query)
-                else:
-                    progress_bar.empty()
-                    status_text.empty()
-                    st.error(TEXTS["analysis_failed"])
+            status_text.text("📊 正在生成可视化...")
+            progress_bar.progress(50)
+            
+            analysis_result = self._perform_basic_analysis(query, sample_data)
+            progress_bar.progress(75)
+            
+            status_text.text("✅ 分析完成")
+            progress_bar.progress(100)
+            
+            if analysis_result:
+                progress_bar.empty()
+                status_text.empty()
+                st.success("✅ 分析完成！")
+                self._display_analysis_results(analysis_result, sample_data, query)
             else:
                 progress_bar.empty()
                 status_text.empty()
-                st.error(TEXTS["ai_not_initialized"])
+                st.error("❌ 分析失败，请重试")
         except Exception as e:
             progress_bar.empty()
             status_text.empty()
             st.error(TEXTS["error_occurred"].format(error=str(e)))
         finally:
             st.session_state.analysis_running = False
+
+    def _execute_analysis(
+        self, query: str, sample_data: pd.DataFrame, llm: Any
+    ) -> None:
+        """Execute analysis with progress indicators (legacy method for backward compatibility).
+
+        Args:
+            query: User query for analysis.
+            sample_data: DataFrame to analyze.
+            llm: Initialized LLM instance.
+        """
+        # Always use basic analysis, hide PandasAI from user
+        self._execute_basic_analysis_only(query, sample_data)
 
     def _display_analysis_results(
         self, analysis_result: str, sample_data: pd.DataFrame, query: str
