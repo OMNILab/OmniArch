@@ -9,6 +9,7 @@ streamlit run tests/test_pandasai.py
 ```
 """
 
+import sys
 import pandas as pd
 from pandasai import SmartDataframe
 from pandasai.config import Config
@@ -19,67 +20,26 @@ import random
 import os
 from datetime import datetime, timedelta
 import openai
+from pandasai.connectors import PandasConnector  # <-- Add this import
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../")
+
+from modules.llm_dashscope import DashScopeOpenAI
+from modules.utils import setup_matplotlib_fonts
+
+
+# Setup fonts
+setup_matplotlib_fonts()
 
 # 初始化 Faker
 fake = Faker("zh_CN")
 
 
-class DashScopeOpenAI(OpenAI):
-    """Custom OpenAI class for DashScope's Qwen models"""
-
-    _supported_chat_models = [
-        "qwen-plus",
-        "qwen-turbo",
-        "qwen-max",
-        # Add other Qwen models as needed from DashScope documentation
-    ]
-
-    def __init__(self, api_token: str, model: str = "qwen-plus", **kwargs):
-        """
-        Initialize the DashScopeOpenAI class with DashScope's API base and Qwen model.
-
-        Args:
-            api_token (str): DashScope API key.
-            model (str): Qwen model name (e.g., 'qwen-plus').
-            **kwargs: Additional parameters for the OpenAI client.
-        """
-        # Set DashScope's API base
-        kwargs["api_base"] = kwargs.get("api_base", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
-        
-        # Initialize the parent OpenAI class
-        super().__init__(api_token=api_token, model=model, **kwargs)
-
-        # Force chat model client for Qwen models
-        self._is_chat_model = True
-        self.client = (
-            openai.OpenAI(**self._client_params).chat.completions
-            if self.is_openai_v1()
-            else openai.ChatCompletion
-        )
-
-    def is_openai_v1(self) -> bool:
-        """
-        Check if the openai library version is >= 1.0.
-        
-        Returns:
-            bool: True if openai version is >= 1.0, False otherwise.
-        """
-        import openai
-        try:
-            # For openai >= 1.0, the version is stored in openai.__version__
-            version = openai.__version__
-            major_version = int(version.split('.')[0])
-            return major_version >= 1
-        except AttributeError:
-            # For older versions, assume pre-1.0
-            return False
-
 def setup_pandasai():
     """设置 pandasAI"""
     try:
         llm = DashScopeOpenAI(
-            api_token=os.getenv("DASHSCOPE_API_KEY"),
-            model="qwen-plus"
+            api_token=os.getenv("DASHSCOPE_API_KEY"), model="qwen-plus"
         )
         return llm
     except Exception as e:
@@ -90,7 +50,13 @@ def setup_pandasai():
 def create_smart_dataframe(df, llm):
     """创建 SmartDataframe"""
     try:
-        config = Config(llm=llm, verbose=True)
+        config = Config(
+            llm=llm,
+            verbose=True,
+            enable_plotting=True,
+            save_charts=True,
+            save_charts_path="./charts",
+        )
         smart_df = SmartDataframe(df, config=config)
         return smart_df
     except Exception as e:
@@ -216,27 +182,37 @@ def demo_pandasai_queries():
     if st.button("🚀 执行智能查询"):
         llm = setup_pandasai()
 
-        if llm:
-            try:
-                # 合并数据以便查询
-                merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
+        # 合并数据以便查询
+        merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
 
-                with st.spinner("正在执行智能查询..."):
-                    # 执行查询
-                    smart_df = create_smart_dataframe(merged_df, llm)
-                    if smart_df:
-                        response = smart_df.chat(selected_query)
-                        st.success("查询完成！")
-                        st.markdown("### 📈 查询结果")
-                        st.write(response)
-                    else:
-                        st.error("无法创建智能数据框")
+        with st.spinner(f"正在执行智能查询..."):
+            # 执行查询
+            smart_df = create_smart_dataframe(merged_df, llm)
+            if smart_df is not None:
+                response = smart_df.chat(selected_query)
+                st.success("查询完成！")
+                st.markdown("### 📈 查询结果")
 
-            except Exception as e:
-                st.error(f"查询执行失败: {e}")
-                st.info("请检查 API Key 设置或网络连接")
-        else:
-            st.error("pandasAI 未正确配置")
+                # Handle different response types
+                if isinstance(response, pd.DataFrame):
+                    st.dataframe(response, use_container_width=True)
+                elif isinstance(response, PandasConnector) or "PandasConnector" in str(
+                    type(response)
+                ):
+                    try:
+                        df = response.to_dataframe()
+                        st.dataframe(df, use_container_width=True)
+                    except Exception as e:
+                        st.write(f"Error converting PandasConnector: {e}")
+                        st.write(str(response))
+                elif hasattr(response, "shape") and hasattr(response, "columns"):
+                    st.dataframe(response, use_container_width=True)
+                elif isinstance(response, (str, int, float)):
+                    st.write(response)
+                else:
+                    st.write(str(response))
+            else:
+                st.error("无法创建智能数据框")
 
     # 自定义查询
     st.markdown("### 🔍 自定义查询")
@@ -250,24 +226,39 @@ def demo_pandasai_queries():
     if st.button("🔍 执行自定义查询") and custom_query:
         llm = setup_pandasai()
 
-        if llm:
-            try:
-                merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
+        try:
+            merged_df = meetings_df.merge(rooms_df, on="room_id", how="left")
 
-                with st.spinner("正在执行自定义查询..."):
-                    smart_df = create_smart_dataframe(merged_df, llm)
-                    if smart_df:
-                        response = smart_df.chat(custom_query)
-                        st.success("查询完成！")
-                        st.markdown("### 📈 查询结果")
+            with st.spinner("正在执行自定义查询..."):
+                smart_df = create_smart_dataframe(merged_df, llm)
+                if smart_df is not None:
+                    response = smart_df.chat(custom_query)
+                    st.success("查询完成！")
+                    st.markdown("### 📈 查询结果")
+
+                    # Handle different response types
+                    if isinstance(response, pd.DataFrame):
+                        st.dataframe(response, use_container_width=True)
+                    elif isinstance(
+                        response, PandasConnector
+                    ) or "PandasConnector" in str(type(response)):
+                        try:
+                            df = response.to_dataframe()
+                            st.dataframe(df, use_container_width=True)
+                        except Exception as e:
+                            st.write(f"Error converting PandasConnector: {e}")
+                            st.write(str(response))
+                    elif hasattr(response, "shape") and hasattr(response, "columns"):
+                        st.dataframe(response, use_container_width=True)
+                    elif isinstance(response, (str, int, float)):
                         st.write(response)
                     else:
-                        st.error("无法创建智能数据框")
+                        st.write(str(response))
+                else:
+                    st.error("无法创建智能数据框")
 
-            except Exception as e:
-                st.error(f"查询执行失败: {e}")
-        else:
-            st.error("pandasAI 未正确配置")
+        except Exception as e:
+            st.error(f"查询执行失败: {e}")
 
 
 def show_advanced_analytics():
@@ -414,14 +405,10 @@ def show_advanced_analytics():
         # 可视化
         import plotly.express as px
 
-        fig = px.line(
-            time_analysis, x="日期", y="会议次数", title="每日会议数量趋势"
-        )
+        fig = px.line(time_analysis, x="日期", y="会议次数", title="每日会议数量趋势")
         st.plotly_chart(fig, use_container_width=True)
 
-        fig2 = px.line(
-            time_analysis, x="日期", y="总成本", title="每日会议成本趋势"
-        )
+        fig2 = px.line(time_analysis, x="日期", y="总成本", title="每日会议成本趋势")
         st.plotly_chart(fig2, use_container_width=True)
 
 
@@ -438,9 +425,7 @@ def main():
 
     # 侧边栏
     st.sidebar.title("功能选择")
-    demo_type = st.sidebar.selectbox(
-        "选择演示类型", ["智能查询演示", "高级数据分析"]
-    )
+    demo_type = st.sidebar.selectbox("选择演示类型", ["智能查询演示", "高级数据分析"])
 
     if demo_type == "智能查询演示":
         demo_pandasai_queries()
