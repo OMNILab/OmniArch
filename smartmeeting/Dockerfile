@@ -22,7 +22,8 @@ RUN apt-get update && apt-get install -y \
 # Set Python 3.11 as default
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 \
-    && python3.11 -m ensurepip --upgrade
+    && python3.11 -m ensurepip --upgrade \
+    && pip3 install --upgrade pip setuptools wheel
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -36,14 +37,17 @@ RUN curl -sSL https://install.python-poetry.org | python3.11 -
 # Copy dependency files
 COPY pyproject.toml poetry.lock ./
 
-# Configure Poetry to avoid virtualenv creation (optional)
+# Configure Poetry to avoid virtualenv creation and handle system packages
 RUN poetry config virtualenvs.create false
 
-# Remove system pyparsing to avoid uninstall conflict
-RUN apt-get remove -y python3-pyparsing python3-blinker || true
+# Remove system packages that conflict with Poetry
+RUN apt-get remove -y python3-pyparsing python3-blinker python3-cryptography python3-setuptools python3-wheel || true
 
-# Install dependencies
-RUN poetry install --no-interaction --no-ansi --no-root
+# Force reinstall cryptography to ensure proper installation
+RUN pip3 install --force-reinstall --no-deps cryptography
+
+# Install dependencies with --only main to avoid dev dependencies conflicts
+RUN poetry install --no-interaction --no-ansi --no-root --only main
 
 # Copy application code
 COPY . .
