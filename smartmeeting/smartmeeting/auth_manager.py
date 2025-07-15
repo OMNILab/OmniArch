@@ -84,7 +84,7 @@ class AuthManager:
         """Check if user is authenticated"""
         # Temporarily disable authentication for testing
         # TODO: Re-enable authentication by uncommenting the line below
-        # return st.session_state.authenticated
+        return st.session_state.authenticated
 
         # Auto-authenticate with demo user for testing
         if not st.session_state.authenticated:
