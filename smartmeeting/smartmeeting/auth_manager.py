@@ -40,36 +40,31 @@ class AuthManager:
         # Increment login attempts
         st.session_state.login_attempts += 1
 
-        # For demo purposes, accept any username/password
-        # In real implementation, this would validate against database
-
-        # Find user by username
-        users = self.data_manager.get_dataframe("users")
-        user = users[users["username"] == username]
-
-        if len(user) == 0:
-            # Create demo user if not found
-            demo_user = {
-                "id": len(users) + 1,
-                "username": username,
-                "name": f"Demo User ({username})",
-                "email": f"{username}@company.com",
-                "department": "研发部",
-                "role": "会议组织者",
+        # Check for default admin credentials
+        if username == "admin" and password == "admin123":
+            # Set up admin user
+            admin_user = {
+                "id": 1,
+                "username": "admin",
+                "name": "系统管理员",
+                "email": "admin@company.com",
+                "department": "IT部",
+                "role": "系统管理员",
                 "created_at": "2024-01-01",
                 "last_login": st.session_state.get("current_time", "2024-01-01"),
             }
-            st.session_state.mock_data["users"].append(demo_user)
-            user_data = demo_user
-        else:
-            user_data = user.iloc[0].to_dict()
 
-        # Set session state
-        st.session_state.authenticated = True
-        st.session_state.current_user = user_data
-        st.session_state.login_time = st.session_state.get("current_time", "2024-01-01")
+            # Set session state
+            st.session_state.authenticated = True
+            st.session_state.current_user = admin_user
+            st.session_state.login_time = st.session_state.get(
+                "current_time", "2024-01-01"
+            )
 
-        return True
+            return True
+
+        # Invalid credentials
+        return False
 
     def logout(self):
         """Logout current user and clear session state"""

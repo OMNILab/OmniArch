@@ -41,18 +41,6 @@ class LoginPage:
                     if st.form_submit_button("重置"):
                         st.rerun()
 
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            # Demo users help
-            st.markdown(
-                """
-            **演示用户提示：**
-            - 输入任意用户名和密码即可登录
-            - 系统会自动创建演示用户
-            - 数据仅在当前会话中保存
-            """
-            )
-
             # Handle login outside form
             if submitted:
                 if username and password:
