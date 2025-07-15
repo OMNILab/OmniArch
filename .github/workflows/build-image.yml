@@ -24,10 +24,10 @@ jobs:
         with:
           filters: |
             smartmeeting:
-              - 'Dockerfile'
-              - 'mock/**'
+              - 'smartmeeting/Dockerfile'
+              - 'smartmeeting/mock/**'
               - 'smartmeeting/**'
-              - 'app.py'
+              - 'smartmeeting/app.py'
 
   build-and-push:
     needs: filter-changes
@@ -36,8 +36,8 @@ jobs:
       matrix:
         component:
           - name: smartmeeting
-            path: Dockerfile
-            context: .
+            path: smartmeeting/Dockerfile
+            context: smartmeeting
             tag: smartmeeting
             version: latest
             condition: ${{ needs.filter-changes.outputs.smartmeeting }}
