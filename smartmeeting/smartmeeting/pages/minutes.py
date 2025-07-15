@@ -209,14 +209,45 @@ class MinutesPage:
             )
 
             if selected_audio != "请选择音频文件":
-                st.success(f"已选择: {selected_audio}")
+                # Get the audio file URL
+                audio_url = audio_files[selected_audio]
 
-                # Show file information
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.info(f"**文件类型**: MP4视频")
-                with col2:
-                    st.info(f"**预计时长**: 约15分钟")
+                # Create audio player with custom styling
+                st.markdown(
+                    """
+                <style>
+                .audio-player {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 10px;
+                    padding: 10px;
+                    margin: 10px 0;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                }
+                .audio-player audio {
+                    width: 100%;
+                    height: 30px;
+                }
+                </style>
+                """,
+                    unsafe_allow_html=True,
+                )
+
+                # Audio player container
+                st.markdown(
+                    f"""
+                <div class="audio-player">
+                    <h4 style="color: white; margin-bottom: 15px;">🎧 {selected_audio}</h4>
+                    <audio controls preload="metadata">
+                        <source src="{audio_url}" type="video/mp4">
+                        您的浏览器不支持音频播放。
+                    </audio>
+                    <p style="color: white; margin-top: 10px; font-size: 12px;">
+                        💡 提示：您可以先预览音频内容，确认无误后再进行转写
+                    </p>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
 
                 # Check if environment variables are set
                 ak_id = os.getenv("ALIYUN_AK_ID")
@@ -228,7 +259,9 @@ class MinutesPage:
                         "缺少必要的环境变量配置。请设置 ALIYUN_AK_ID、ALIYUN_AK_SECRET 和 NLS_APP_KEY"
                     )
                 else:
-                    if st.button("开始转写", type="primary", key="start_transcription"):
+                    if st.button(
+                        "生成会议纪要", type="primary", key="start_transcription"
+                    ):
                         with st.spinner("正在转写音频文件..."):
                             try:
                                 file_link = audio_files[selected_audio]

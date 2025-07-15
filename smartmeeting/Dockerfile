@@ -37,16 +37,14 @@ RUN curl -sSL https://install.python-poetry.org | python3.11 -
 # Copy dependency files
 COPY pyproject.toml poetry.lock ./
 
-# Configure Poetry to avoid virtualenv creation and handle system packages
-RUN poetry config virtualenvs.create false
+# Configure Poetry to use virtual environments (recommended approach)
+RUN poetry config virtualenvs.create true
+RUN poetry config virtualenvs.in-project true
 
 # Remove system packages that conflict with Poetry
 RUN apt-get remove -y python3-pyparsing python3-blinker python3-cryptography python3-setuptools python3-wheel || true
 
-# Force reinstall cryptography to ensure proper installation
-RUN pip3 install --force-reinstall --no-deps cryptography
-
-# Install dependencies with --only main to avoid dev dependencies conflicts
+# Install dependencies in virtual environment
 RUN poetry install --no-interaction --no-ansi --no-root --only main
 
 # Copy application code
@@ -57,5 +55,5 @@ ENV STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_SERVER_ENABLE_CORS=false \
     STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
 
-# Run the app
-CMD ["poetry", "run", "streamlit", "run", "app.py"]
+# Run the app using the virtual environment
+CMD [".venv/bin/streamlit", "run", "app.py"]
