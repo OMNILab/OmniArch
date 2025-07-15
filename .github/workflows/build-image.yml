@@ -73,7 +73,7 @@ jobs:
           context: ${{ matrix.component.context }}
           file: ${{ matrix.component.path }}
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           cache-from: type=gha,scope=${{ matrix.component.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component.name }}
           tags: |
