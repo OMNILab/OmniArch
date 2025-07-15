@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: smartmeeting-app
+    network_mode: host
     ports:
       - "8899:8000"
     environment:
@@ -12,11 +13,7 @@ services:
       - STREAMLIT_SERVER_HEADLESS=true
       - STREAMLIT_SERVER_ENABLE_CORS=false
       - STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
-    volumes:
-      # Mount data directory for persistence
-      - ./data:/app/data
-      # Mount exports directory for charts and exports
-      - ./exports:/app/exports
+      - STREAMLIT_LOGGER_LEVEL=debug
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/_stcore/health"]

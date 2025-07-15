@@ -59,4 +59,4 @@ ENV STREAMLIT_SERVER_PORT=8000 \
     STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
 
 # Run the app
-CMD ["poetry", "run", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]
+CMD ["poetry", "run", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0", "--server.headless=true"]
