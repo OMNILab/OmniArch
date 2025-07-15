@@ -46,17 +46,12 @@ RUN apt-get remove -y python3-pyparsing python3-blinker || true
 RUN poetry install --no-interaction --no-ansi --no-root
 
 # Copy application code
-COPY mock/ mock/
-COPY smartmeeting/ smartmeeting/
-COPY app.py app.py
+COPY . .
 
 # Streamlit config
-EXPOSE 8000
-ENV STREAMLIT_SERVER_PORT=8000 \
-    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
-    STREAMLIT_SERVER_HEADLESS=true \
+ENV STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_SERVER_ENABLE_CORS=false \
     STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
 
 # Run the app
-CMD ["poetry", "run", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0", "--server.headless=true"]
+CMD ["poetry", "run", "streamlit", "run", "app.py"]
