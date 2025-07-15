@@ -1,16 +1,29 @@
+#! /usr/bin/env python
+# coding=utf-8
 """
-pandasAI 集成演示
-展示如何在智慧会议系统中使用 pandasAI 进行智能数据查询
-
-Run with:
-
-```bash
-streamlit run tests/test_pandasai.py
-```
+Test script for pandasai integration
 """
 
 import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import random
+import json
+import time
+import traceback
+import warnings
+
+# Suppress warnings for cleaner output
+warnings.filterwarnings("ignore")
+
+# Import the functions to test
+from smartmeeting.tools import setup_pandasai_llm, create_pandasai_agent
+
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -23,7 +36,6 @@ import os
 from datetime import datetime, timedelta
 from pandasai.core.response.chart import ChartResponse
 from matplotlib.figure import Figure as MatplotlibFigure
-from smartmeeting.llm import setup_pandasai_llm, create_pandasai_agent
 
 # Setup fonts
 from smartmeeting.plots import setup_matplotlib_fonts

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # coding=utf-8
 import os
-from smartmeeting.lingji_ai import get_nls_token, transcribe_file
+from smartmeeting.tools import get_nls_token, transcribe_file
 
 
 def test_token_request():

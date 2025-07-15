@@ -6,11 +6,18 @@ Contains the PandasAI demo page implementation for the smart meeting system
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from typing import Optional, Dict, Any, Callable
-from datetime import datetime
-import time
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+from datetime import datetime, timedelta
+import calendar
+from collections import defaultdict
+import json
+import os
 import logging
-from smartmeeting.llm import setup_pandasai_llm, create_pandasai_agent
+import time
+from typing import Optional, Dict, Any, Callable
+from smartmeeting.tools import setup_pandasai_llm, create_pandasai_agent
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

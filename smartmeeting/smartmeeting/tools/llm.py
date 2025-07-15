@@ -1,3 +1,8 @@
+"""
+LLM Tools Module
+Contains functions for setting up and managing Large Language Models
+"""
+
 from pandasai_openai import OpenAI
 import openai
 import os
@@ -68,7 +73,7 @@ class PandasAILLMDashScope(OpenAI):
 def setup_pandasai_llm():
     """Setup DashScope LLM for AI analysis"""
     try:
-        from smartmeeting.llm import PandasAILLMDashScope
+        from smartmeeting.tools.llm import PandasAILLMDashScope
     except ImportError:
         print("PandasAILLMDashScope not available. Using mock analysis.")
         return None

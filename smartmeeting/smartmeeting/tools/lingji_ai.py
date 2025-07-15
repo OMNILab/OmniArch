@@ -1,3 +1,8 @@
+"""
+Lingji AI Tools Module
+Contains functions for Aliyun Lingji AI speech recognition services
+"""
+
 # -*- coding: utf8 -*-
 # 阿里灵杰AI开放服务
 import time

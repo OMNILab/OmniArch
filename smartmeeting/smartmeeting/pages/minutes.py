@@ -5,6 +5,12 @@ Contains the minutes page implementation for the smart meeting system
 
 import streamlit as st
 import pandas as pd
+import os
+from smartmeeting.tools import (
+    transcribe_file,
+    generate_minutes_from_text,
+    extract_transcription_text,
+)
 
 
 class MinutesPage:
@@ -14,6 +20,26 @@ class MinutesPage:
         self.data_manager = data_manager
         self.auth_manager = auth_manager
         self.ui = ui_components
+
+    def _get_status_color(self, status):
+        """Get color for different status types"""
+        status_colors = {
+            "草稿": "🔵",  # Blue circle for draft
+            "已确认": "🟡",  # Yellow circle for confirmed
+            "已发布": "🟢",  # Green circle for published
+            "未知状态": "⚪",  # White circle for unknown
+        }
+        return status_colors.get(status, "⚪")
+
+    def _get_status_style(self, status):
+        """Get CSS style for status background color"""
+        status_styles = {
+            "草稿": "background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 8px; border-radius: 4px;",
+            "已确认": "background-color: #fff3e0; border-left: 4px solid #ff9800; padding: 8px; border-radius: 4px;",
+            "已发布": "background-color: #e8f5e8; border-left: 4px solid #4caf50; padding: 8px; border-radius: 4px;",
+            "未知状态": "background-color: #f5f5f5; border-left: 4px solid #9e9e9e; padding: 8px; border-radius: 4px;",
+        }
+        return status_styles.get(status, status_styles["未知状态"])
 
     def show(self):
         """Meeting minutes page implementation with enhanced functionality"""
@@ -92,19 +118,32 @@ class MinutesPage:
             )
 
             selected_meeting_id = None
-            selected_meeting_title = new_meeting_title if new_meeting_title else None
+            # Fallback: use auto-generated title if empty
+            if new_meeting_title and new_meeting_title.strip():
+                selected_meeting_title = new_meeting_title.strip()
+            else:
+                selected_meeting_title = (
+                    f"会议纪要_{new_meeting_datetime.strftime('%Y%m%d_%H%M')}"
+                )
 
-        # File upload section
+        # File upload section with tabs
         st.markdown("#### 上传会议材料")
-        col1, col2 = st.columns(2)
 
-        with col1:
+        # Create tabs for different upload methods
+        tab1, tab2 = st.tabs(["📄 文本文件", "🎵 音频文件"])
+
+        with tab1:
+            st.markdown("**上传文本文件**")
+            st.markdown(
+                "支持上传会议记录、会议笔记等文本文件，系统将自动分析并生成结构化会议纪要。"
+            )
+
             uploaded_text = st.file_uploader(
-                "上传文本文件", type=["txt", "docx", "pdf"]
+                "选择文本文件", type=["txt", "docx", "pdf"], key="text_uploader"
             )
             if uploaded_text:
                 st.success(f"已上传: {uploaded_text.name}")
-                if st.button("生成纪要", type="primary"):
+                if st.button("生成纪要", type="primary", key="generate_from_text"):
                     with st.spinner("正在生成会议纪要..."):
                         try:
                             # Read the uploaded text file
@@ -115,10 +154,20 @@ class MinutesPage:
                                 st.error("目前仅支持txt文件格式")
                                 return
 
+                            # Fallback: if selected_meeting_title is empty, use first 8 chars of content
+                            meeting_title_to_use = selected_meeting_title
+                            if (
+                                not meeting_title_to_use
+                                or not meeting_title_to_use.strip()
+                            ):
+                                meeting_title_to_use = (
+                                    content[:8].strip() or "未命名纪要"
+                                )
+
                             # Generate meeting minutes using pandasai
-                            generated_minute = self._generate_minutes_from_text(
+                            generated_minute = generate_minutes_from_text(
                                 content,
-                                selected_meeting_title,
+                                meeting_title_to_use,
                                 (
                                     new_meeting_datetime
                                     if "new_meeting_datetime" in locals()
@@ -139,33 +188,147 @@ class MinutesPage:
                         except Exception as e:
                             st.error(f"处理文件时出错: {str(e)}")
 
-        with col2:
-            uploaded_audio = st.file_uploader(
-                "上传音频文件", type=["mp3", "wav", "m4a"]
+        with tab2:
+            st.markdown("**选择音频文件**")
+            st.markdown(
+                "从预设的音频文件中选择，系统将自动转写语音内容并生成会议纪要。"
             )
-            if uploaded_audio:
-                st.success(f"已上传: {uploaded_audio.name}")
-                if st.button("开始转写", type="primary"):
-                    with st.spinner("正在转写音频..."):
-                        import time
 
-                        time.sleep(2)  # Simulate processing
-                        st.success("转写完成！")
-                        st.session_state.minute_form_data["transcription"] = (
-                            "这是转写后的会议内容示例..."
-                        )
+            # Audio file selection dropdown
+            audio_files = {
+                "全景视频会议": "http://116.62.193.164:9380/public/omniarch/sample1_8k_15min.mp4",
+                "招聘会议": "http://116.62.193.164:9380/public/omniarch/sample2_8k_15min.mp4",
+                "经营分析会议": "http://116.62.193.164:9380/public/omniarch/sample3_8k_15min.mp4",
+                "股东电话会会议": "http://116.62.193.164:9380/public/omniarch/sample4_8k_15min.mp4",
+            }
+
+            selected_audio = st.selectbox(
+                "选择音频文件",
+                ["请选择音频文件"] + list(audio_files.keys()),
+                key="audio_selector",
+            )
+
+            if selected_audio != "请选择音频文件":
+                st.success(f"已选择: {selected_audio}")
+
+                # Show file information
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info(f"**文件类型**: MP4视频")
+                with col2:
+                    st.info(f"**预计时长**: 约15分钟")
+
+                # Check if environment variables are set
+                ak_id = os.getenv("ALIYUN_AK_ID")
+                ak_secret = os.getenv("ALIYUN_AK_SECRET")
+                app_key = os.getenv("NLS_APP_KEY")
+
+                if not all([ak_id, ak_secret, app_key]):
+                    st.error(
+                        "缺少必要的环境变量配置。请设置 ALIYUN_AK_ID、ALIYUN_AK_SECRET 和 NLS_APP_KEY"
+                    )
+                else:
+                    if st.button("开始转写", type="primary", key="start_transcription"):
+                        with st.spinner("正在转写音频文件..."):
+                            try:
+                                file_link = audio_files[selected_audio]
+
+                                # Call the transcription function
+                                result = transcribe_file(
+                                    ak_id, ak_secret, app_key, file_link
+                                )
+
+                                if result:
+                                    # Extract the transcription text from the result
+                                    transcription_text = extract_transcription_text(
+                                        result
+                                    )
+
+                                    if transcription_text:
+                                        st.success("音频转写完成！")
+
+                                        # Show transcription preview
+                                        with st.expander("查看转写结果"):
+                                            st.text_area(
+                                                "转写文本",
+                                                transcription_text,
+                                                height=200,
+                                            )
+
+                                        # Fallback: if selected_meeting_title is empty, use first 8 chars of transcription_text
+                                        meeting_title_to_use = selected_meeting_title
+                                        if (
+                                            not meeting_title_to_use
+                                            or not meeting_title_to_use.strip()
+                                        ):
+                                            meeting_title_to_use = (
+                                                transcription_text[:8].strip()
+                                                or "未命名纪要"
+                                            )
+
+                                        # Generate minutes from transcription
+                                        generated_minute = generate_minutes_from_text(
+                                            transcription_text,
+                                            meeting_title_to_use,
+                                            (
+                                                new_meeting_datetime
+                                                if "new_meeting_datetime" in locals()
+                                                else None
+                                            ),
+                                        )
+
+                                        # Debug: Show generated minute result
+                                        st.write("生成的纪要数据:", generated_minute)
+
+                                        if generated_minute:
+                                            # Add to data manager
+                                            self.data_manager.add_minute(
+                                                generated_minute
+                                            )
+                                            # 立即刷新 minutes_df，以便展示时不依赖过期状态
+                                            minutes_df = (
+                                                self.data_manager.get_dataframe(
+                                                    "minutes"
+                                                )
+                                            )
+                                            st.success("会议纪要生成完成并已保存！")
+                                            st.rerun()
+                                        else:
+                                            st.error("生成会议纪要失败，请重试")
+                                    else:
+                                        st.error("转写结果为空，请重试")
+                                else:
+                                    st.error("音频转写失败，请重试")
+
+                            except Exception as e:
+                                st.error(f"转写过程中出错: {str(e)}")
 
         # Show current meeting info
-        if selected_meeting_title:
-            st.info(f"当前会议: {selected_meeting_title}")
-        elif meeting_mode == "创建新会议" and new_meeting_title:
-            st.info(f"新会议: {new_meeting_title}")
-        else:
-            st.warning("请选择会议或输入会议标题")
+        # if selected_meeting_title:
+        #     st.info(f"当前会议: {selected_meeting_title}")
+        # elif meeting_mode == "创建新会议" and new_meeting_title:
+        #     st.info(f"新会议: {new_meeting_title}")
+        # else:
+        #     st.warning("请选择会议或输入会议标题")
 
         # Minutes list with enhanced features
         st.markdown("---")
         st.markdown("### 纪要列表")
+
+        # Status legend
+        st.markdown("#### 📊 状态说明")
+        legend_col1, legend_col2, legend_col3, legend_col4 = st.columns(4)
+
+        with legend_col1:
+            st.markdown("🔵 **草稿** - 待确认的会议纪要")
+        with legend_col2:
+            st.markdown("🟡 **已确认** - 已确认的会议纪要")
+        with legend_col3:
+            st.markdown("🟢 **已发布** - 已发布的会议纪要")
+        with legend_col4:
+            st.markdown("⚪ **未知** - 状态未知的会议纪要")
+
+        st.markdown("---")
 
         if len(minutes_df) > 0:
             # Sort by meeting time (descending)
@@ -275,7 +438,28 @@ class MinutesPage:
                     raw_id = minute.get("id") or minute.get("minute_id") or f"nan_{idx}"
                     minute_id = str(raw_id) if pd.notna(raw_id) else f"nan_{idx}"
 
-                    with st.expander(f"{title} - {status} ({display_time})"):
+                    # Get status color and style
+                    status_color = self._get_status_color(status)
+                    status_style = self._get_status_style(status)
+
+                    # Create expander with color-coded status
+                    expander_title = (
+                        f"{status_color} {title} - {status} ({display_time})"
+                    )
+
+                    with st.expander(expander_title):
+                        # Apply status-based styling to the content
+                        st.markdown(
+                            f"""
+                        <div style="{status_style}">
+                        <h4>📋 会议信息</h4>
+                        <p><strong>状态:</strong> {status}</p>
+                        <p><strong>创建时间:</strong> {display_time}</p>
+                        </div>
+                        """,
+                            unsafe_allow_html=True,
+                        )
+
                         # 上部内容：会议摘要、与会人员、决策事项、行动项
                         col1, col2 = st.columns(2)
 
@@ -300,6 +484,18 @@ class MinutesPage:
                                     # 如果是列表，直接显示
                                     for attendee in attendees:
                                         st.markdown(f"• {attendee}")
+
+                            # 显示会议纪要全文（默认收起）
+                            original_text = minute.get("original_text", "")
+                            if original_text:
+                                with st.expander("📄 查看会议纪要全文", expanded=False):
+                                    st.text_area(
+                                        "会议纪要全文",
+                                        value=original_text,
+                                        height=300,
+                                        disabled=True,
+                                        key=f"full_text_{minute_id}_{idx}",
+                                    )
 
                         with col2:
                             decisions = minute.get("decisions", [])
@@ -351,122 +547,3 @@ class MinutesPage:
                 st.info("没有找到符合条件的会议纪要")
         else:
             st.info("暂无会议纪要")
-
-    def _generate_minutes_from_text(self, text, meeting_title, meeting_datetime=None):
-        """
-        Use pandasai LLM to generate meeting minutes from uploaded text.
-        Returns a dict matching the meeting_minutes.csv/data_manager format.
-        """
-        import pandas as pd
-        import streamlit as st
-        from smartmeeting.llm import setup_pandasai_llm, create_pandasai_agent
-
-        # Prepare the input as a DataFrame for pandasai
-        df = pd.DataFrame({"content": [text]})
-
-        # Setup LLM and Agent
-        llm = setup_pandasai_llm()
-        if llm is None:
-            st.error("未能初始化大模型接口，无法生成纪要。请检查API KEY配置。")
-            return None
-
-        try:
-            # Use direct LLM call instead of pandasai agent to avoid SQL constraints
-            from smartmeeting.llm import setup_chat_llm
-            import openai
-
-            chat_llm = setup_chat_llm()
-            if chat_llm is None:
-                st.error("未能初始化聊天模型接口，无法生成纪要。")
-                return None
-
-            # Define the prompt for LLM
-            prompt = (
-                f"请将以下会议原始文本内容，提取并结构化为会议纪要。"
-                f"文本内容：{text}\n\n"
-                f"请提取以下信息并以JSON格式返回：\n"
-                f"- summary: 会议摘要\n"
-                f"- key_decisions: 决策事项（用分号分隔）\n"
-                f"- action_items: 行动项（用分号分隔）\n"
-                f"- attendees: 与会人（用分号分隔）\n"
-                f"- meeting_title: 会议标题（如果文本中未明确提及可留空）\n"
-                f"- duration_minutes: 会议时长（分钟数，若无法确定可填60）\n"
-                f"注意：不要解析会议日期和时间，这些将由用户提供。"
-                f"请只返回JSON格式数据，不要其他内容。"
-            )
-
-            # Call LLM directly
-            response = chat_llm.chat.completions.create(
-                model="qwen-plus",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,
-            )
-
-            # Parse LLM response
-            llm_response = response.choices[0].message.content.strip()
-
-            import json
-            import re
-
-            # Find JSON in the response
-            json_match = re.search(r"\{.*\}", llm_response, re.DOTALL)
-            if json_match:
-                parsed_data = json.loads(json_match.group())
-            else:
-                st.error("无法解析LLM返回的JSON数据")
-                return None
-
-            # Create DataFrame from parsed data
-            result_df = pd.DataFrame(
-                [
-                    {
-                        "summary": parsed_data.get("summary", ""),
-                        "key_decisions": parsed_data.get("key_decisions", ""),
-                        "action_items": parsed_data.get("action_items", ""),
-                        "attendees": parsed_data.get("attendees", ""),
-                        "status": "草稿",
-                        "duration_minutes": parsed_data.get("duration_minutes", 60),
-                        "transcript_available": 1,
-                        "meeting_title": parsed_data.get("meeting_title", ""),
-                    }
-                ]
-            )
-
-            # Take the first row
-            row = result_df.iloc[0].to_dict()
-
-            # 🧠 修复逻辑：title 设为 meeting_title > LLM 生成 > fallback
-            fallback_title = "未命名纪要"
-            row["title"] = (
-                meeting_title.strip()
-                if meeting_title and meeting_title.strip()
-                else row.get("meeting_title", "").strip() or fallback_title
-            )
-
-            # 确保 meeting_title 也同步写入
-            if not row.get("meeting_title") or not row["meeting_title"].strip():
-                row["meeting_title"] = row["title"]
-
-            # Set timestamps
-            if meeting_datetime is not None:
-                row["created_datetime"] = meeting_datetime
-                row["updated_datetime"] = meeting_datetime
-            else:
-                current_time = pd.Timestamp.now()
-                row["created_datetime"] = current_time
-                row["updated_datetime"] = current_time
-
-            # Default values
-            row.setdefault("status", "草稿")
-            row.setdefault("duration_minutes", 60)
-            row.setdefault("transcript_available", 1)
-
-            # ✅ 调试输出（可选）
-            print("生成纪要标题：", row["title"])
-            print("纪要结构：", row)
-
-            return row
-
-        except Exception as e:
-            st.error(f"调用大模型生成纪要失败: {e}")
-            return None

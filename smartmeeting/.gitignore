@@ -214,3 +214,4 @@ cache/
 charts/
 .python-version
 .venv
+.DS_Store

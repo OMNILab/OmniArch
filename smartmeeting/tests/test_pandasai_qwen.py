@@ -5,7 +5,12 @@ Tests the integration between pandasai and DashScope's Qwen models using a sampl
 
 import pandas as pd
 import pandasai as pai
-from smartmeeting.llm import setup_pandasai_llm, create_pandasai_agent
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from smartmeeting.tools import setup_pandasai_llm, create_pandasai_agent
 
 
 def test_dashscope_pandasai_integration():
