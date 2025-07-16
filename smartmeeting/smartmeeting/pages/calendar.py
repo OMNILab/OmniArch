@@ -55,52 +55,58 @@ class CalendarPage:
 
     def create_room_filter(self, all_rooms):
         """创建会议室筛选器"""
-        st.markdown("### 🔍 筛选选项")
+        # 创建房间显示名称列表
+        room_options = []
+        room_info_map = {}
+        
+        for _, room in all_rooms.iterrows():
+            building_name = self._get_building_name(room.get("building_id", 1))
+            room_display_name = f"{building_name}-{room.get('floor', '未知')}楼 {room.get('room_name', room.get('name', '未知'))}"
+            room_options.append(room_display_name)
+            room_info_map[room_display_name] = {
+                'room_id': room.get("room_id", room.get("id")),
+                'capacity': room.get('capacity', '未知'),
+                'equipment': room.get('equipment_notes', room.get('equipment', '')),
+                'building_name': building_name,
+                'floor': room.get('floor', '未知')
+            }
 
-        col1, col2 = st.columns([1, 2])
-
-        with col1:
-            show_all = st.checkbox("📋 显示所有会议室", value=True)
-
-        with col2:
-            if show_all:
-                # 创建房间显示名称列表
-                room_options = []
-                for _, room in all_rooms.iterrows():
-                    building_name = self._get_building_name(room.get("building_id", 1))
-                    room_display_name = f"{building_name}-{room.get('floor', '未知')}楼 {room.get('room_name', room.get('name', '未知'))}"
-                    room_options.append(room_display_name)
-
-                selected_rooms = st.multiselect(
-                    "选择要显示的会议室",
-                    options=room_options,
-                    default=room_options,
-                    help="可以选择一个或多个会议室进行查看",
-                )
-            else:
-                room_options = []
-                for _, room in all_rooms.iterrows():
-                    building_name = self._get_building_name(room.get("building_id", 1))
-                    room_display_name = f"{building_name}-{room.get('floor', '未知')}楼 {room.get('room_name', room.get('name', '未知'))}"
-                    room_options.append(room_display_name)
-
-                selected_rooms = st.multiselect(
-                    "选择要显示的会议室",
-                    options=room_options,
-                    help="可以选择一个或多个会议室进行查看",
-                )
+        # 使用容器创建更好的布局
+        with st.container():
+            st.markdown("### 🔍 会议室筛选")
+            
+            # 创建两列布局
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                show_all = st.checkbox("📋 显示所有会议室", value=True, help="勾选后默认选择所有会议室")
+            
+            with col2:
+                if show_all:
+                    selected_rooms = st.multiselect(
+                        "选择要显示的会议室",
+                        options=room_options,
+                        default=room_options,
+                        help="可以选择一个或多个会议室进行查看",
+                        placeholder="请选择会议室..."
+                    )
+                else:
+                    selected_rooms = st.multiselect(
+                        "选择要显示的会议室",
+                        options=room_options,
+                        help="可以选择一个或多个会议室进行查看",
+                        placeholder="请选择会议室..."
+                    )
 
         # 转换为房间ID列表
         selected_room_ids = []
         room_name_map = {}
 
-        for _, room in all_rooms.iterrows():
-            building_name = self._get_building_name(room.get("building_id", 1))
-            room_display_name = f"{building_name}-{room.get('floor', '未知')}楼 {room.get('room_name', room.get('name', '未知'))}"
-            room_name_map[room.get("room_id", room.get("id"))] = room_display_name
-
-            if room_display_name in selected_rooms:
-                selected_room_ids.append(room.get("room_id", room.get("id")))
+        for room_display_name in selected_rooms:
+            if room_display_name in room_info_map:
+                room_id = room_info_map[room_display_name]['room_id']
+                selected_room_ids.append(room_id)
+                room_name_map[room_id] = room_display_name
 
         return selected_room_ids, room_name_map
 
@@ -216,48 +222,51 @@ class CalendarPage:
 
     def render_statistics(self, bookings, selected_room_ids, room_name_map):
         """渲染统计信息"""
-        st.markdown("### 📊 统计信息")
-
         # 过滤选中房间的预订
         filtered_bookings = bookings[bookings["room_id"].isin(selected_room_ids)]
 
-        col1, col2, col3, col4 = st.columns(4)
+        # 使用容器创建更好的布局
+        with st.container():
+            st.markdown("### 📊 统计概览")
+            
+            # 创建四列布局
+            col1, col2, col3, col4 = st.columns(4)
 
-        with col1:
-            st.metric("📅 总预订数", len(filtered_bookings))
+            with col1:
+                self.ui.create_metric_card("📅 总预订数", str(len(filtered_bookings)))
 
-        with col2:
-            st.metric("🏢 选中房间", len(selected_room_ids))
+            with col2:
+                self.ui.create_metric_card("🏢 选中房间", str(len(selected_room_ids)))
 
-        with col3:
-            # 计算今天的预订
-            today = datetime.now().date()
-            if (
-                not filtered_bookings.empty
-                and "start_datetime" in filtered_bookings.columns
-            ):
-                today_bookings = filtered_bookings[
-                    filtered_bookings["start_datetime"].dt.date == today
-                ]
-                st.metric("📋 今日预订", len(today_bookings))
-            else:
-                st.metric("📋 今日预订", 0)
+            with col3:
+                # 计算今天的预订
+                today = datetime.now().date()
+                if (
+                    not filtered_bookings.empty
+                    and "start_datetime" in filtered_bookings.columns
+                ):
+                    today_bookings = filtered_bookings[
+                        filtered_bookings["start_datetime"].dt.date == today
+                    ]
+                    self.ui.create_metric_card("📋 今日预订", str(len(today_bookings)))
+                else:
+                    self.ui.create_metric_card("📋 今日预订", "0")
 
-        with col4:
-            # 计算本周的预订
-            week_start = today - timedelta(days=today.weekday())
-            week_end = week_start + timedelta(days=6)
-            if (
-                not filtered_bookings.empty
-                and "start_datetime" in filtered_bookings.columns
-            ):
-                week_bookings = filtered_bookings[
-                    (filtered_bookings["start_datetime"].dt.date >= week_start)
-                    & (filtered_bookings["start_datetime"].dt.date <= week_end)
-                ]
-                st.metric("📈 本周预订", len(week_bookings))
-            else:
-                st.metric("📈 本周预订", 0)
+            with col4:
+                # 计算本周的预订
+                week_start = today - timedelta(days=today.weekday())
+                week_end = week_start + timedelta(days=6)
+                if (
+                    not filtered_bookings.empty
+                    and "start_datetime" in filtered_bookings.columns
+                ):
+                    week_bookings = filtered_bookings[
+                        (filtered_bookings["start_datetime"].dt.date >= week_start)
+                        & (filtered_bookings["start_datetime"].dt.date <= week_end)
+                    ]
+                    self.ui.create_metric_card("📈 本周预订", str(len(week_bookings)))
+                else:
+                    self.ui.create_metric_card("📈 本周预订", "0")
 
     def render_sidebar(self):
         """渲染侧边栏"""
@@ -318,34 +327,42 @@ class CalendarPage:
         self.render_statistics(all_bookings, selected_room_ids, room_name_map)
 
         # 显示房间列表
-        st.markdown("### 🏢 选中的会议室")
-
-        for room_id in selected_room_ids:
+        st.markdown("### 🏢 会议室详情")
+        
+        # 使用网格布局显示会议室信息
+        cols = st.columns(3)
+        for idx, room_id in enumerate(selected_room_ids):
             room = all_rooms[all_rooms["room_id"] == room_id]
             if not room.empty:
                 room = room.iloc[0]
-                with st.container():
-                    col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
-
-                    with col1:
+                col_idx = idx % 3
+                
+                with cols[col_idx]:
+                    # 创建会议室卡片
+                    with st.container():
                         st.markdown(
-                            f"**{room.get('room_name', room.get('name', '未知'))}**"
+                            f"""
+                            <div style="background: white; 
+                                        padding: 1.5rem; 
+                                        border-radius: 12px; 
+                                        border: 1px solid #e5e7eb; 
+                                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                        margin-bottom: 1rem;">
+                                <h4 style="color: #1f2937; margin-bottom: 0.5rem;">
+                                    {room.get('room_name', room.get('name', '未知'))}
+                                </h4>
+                                <div style="color: #6b7280; font-size: 0.9rem; line-height: 1.4;">
+                                    <div style="margin-bottom: 0.3rem;">
+                                        📍 {self._get_building_name(room.get("building_id", 1))}-{room.get('floor', '未知')}楼
+                                    </div>
+                                    <div style="margin-bottom: 0.3rem;">
+                                        👥 容量: {room.get('capacity', '未知')}人
+                                    </div>
+                                    <div>
+                                        🔧 {room.get('equipment_notes', room.get('equipment', '无特殊设备'))}
+                                    </div>
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
                         )
-
-                    with col2:
-                        building_name = self._get_building_name(
-                            room.get("building_id", 1)
-                        )
-                        st.markdown(f"📍 {building_name}-{room.get('floor', '未知')}楼")
-
-                    with col3:
-                        st.markdown(f"👥 {room.get('capacity', '未知')}人")
-
-                    with col4:
-                        equipment = room.get(
-                            "equipment_notes", room.get("equipment", "")
-                        )
-                        if equipment:
-                            st.markdown(f"🔧 {equipment}")
-                        else:
-                            st.markdown("🔧 无特殊设备")
