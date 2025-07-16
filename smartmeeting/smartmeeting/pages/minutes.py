@@ -119,7 +119,19 @@ class MinutesPage:
 
             # 按开始时间逆序排序
             if time_col in meetings_df.columns:
-                meetings_df_sorted = meetings_df.sort_values(time_col, ascending=False)
+                # 确保时间列是datetime类型，避免混合类型比较错误
+                try:
+                    meetings_df_copy = meetings_df.copy()
+                    meetings_df_copy[time_col] = pd.to_datetime(
+                        meetings_df_copy[time_col], errors="coerce"
+                    )
+                    meetings_df_sorted = meetings_df_copy.sort_values(
+                        time_col, ascending=False
+                    )
+                except Exception as e:
+                    # 如果转换失败，使用原始数据不排序
+                    print(f"Warning: Could not sort by {time_col}: {e}")
+                    meetings_df_sorted = meetings_df
             else:
                 meetings_df_sorted = meetings_df
 
@@ -496,7 +508,18 @@ class MinutesPage:
 
         if len(minutes_df) > 0:
             # Sort by meeting time (descending)
-            minutes_df = minutes_df.sort_values("created_datetime", ascending=False)
+            try:
+                minutes_df_copy = minutes_df.copy()
+                minutes_df_copy["created_datetime"] = pd.to_datetime(
+                    minutes_df_copy["created_datetime"], errors="coerce"
+                )
+                minutes_df = minutes_df_copy.sort_values(
+                    "created_datetime", ascending=False
+                )
+            except Exception as e:
+                # 如果转换失败，使用原始数据不排序
+                print(f"Warning: Could not sort minutes by created_datetime: {e}")
+                # Keep original order
 
             # Filtering options and pagination in one row
             col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
