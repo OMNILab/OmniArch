@@ -65,6 +65,7 @@ class TasksPage:
             for _, meeting in meetings_df.iterrows():
                 title = meeting.get("meeting_title", "未命名会议")
                 start_time = meeting.get("start_datetime", "")
+                meeting_status = meeting.get("meeting_status", "upcoming")
 
                 # 处理时间格式
                 if start_time:
@@ -82,12 +83,25 @@ class TasksPage:
                     start_time_dt = pd.Timestamp.min
                     start_time_str = "时间未知"
 
+                # 根据会议状态添加标识（与会议纪要保持一致）
+                status_icon = (
+                    "🕐"
+                    if meeting_status == "upcoming"
+                    else "🔄" if meeting_status == "ongoing" else "✅"
+                )
+                status_text = (
+                    "未进行"
+                    if meeting_status == "upcoming"
+                    else "进行中" if meeting_status == "ongoing" else "已完成"
+                )
+
                 meetings_list.append(
                     {
                         "title": title,
                         "start_time": start_time_dt,
-                        "display_text": f"{title} ({start_time_str})",
+                        "display_text": f"{status_icon} {title} ({start_time_str}) - {status_text}",
                         "meeting_id": meeting.get("booking_id", meeting.get("id")),
+                        "meeting_status": meeting_status,
                     }
                 )
 
@@ -127,8 +141,15 @@ class TasksPage:
 
         # Apply meeting filter
         if selected_meeting != "全部":
-            # 从选中的会议选项中提取会议标题
+            # 从选中的会议选项中提取会议标题（去除状态图标）
+            # 格式: "🕐 会议标题 (时间) - 状态"
             meeting_title = selected_meeting.split(" (")[0]
+            if (
+                meeting_title.startswith("🕐 ")
+                or meeting_title.startswith("🔄 ")
+                or meeting_title.startswith("✅ ")
+            ):
+                meeting_title = meeting_title[2:]  # 移除状态图标
 
             # 查找对应的会议ID
             selected_meeting_id = None
