@@ -103,6 +103,24 @@ streamlit run app.py
 
 ## 🔧 自定义配置
 
+### 环境变量配置
+
+系统支持通过环境变量进行配置，主要配置项包括：
+
+| 变量名 | 说明 | 默认值 | 必需 |
+|--------|------|--------|------|
+| `STREAMLIT_SERVER_PORT` | Streamlit 服务端口 | 8729 | 否 |
+| `STREAMLIT_SERVER_ADDRESS` | Streamlit 服务地址 | 0.0.0.0 | 否 |
+| `DASHSCOPE_API_KEY` | 阿里云 DashScope API 密钥 | - | 是 |
+| `ALIYUN_AK_ID` | 阿里云 Access Key ID | - | 否 |
+| `ALIYUN_AK_SECRET` | 阿里云 Access Key Secret | - | 否 |
+| `NLS_APP_KEY` | 阿里云语音识别 App Key | - | 否 |
+
+**重要提示**: 
+- 生产环境中请务必设置 `DASHSCOPE_API_KEY`
+- 如需使用语音转写功能，请配置阿里云相关密钥
+- `.env` 文件包含敏感信息，已添加到 `.gitignore` 中
+
 ### 修改模拟数据
 编辑 `app.py` 中的 `generate_mock_*()` 函数来调整模拟数据：
 
@@ -130,6 +148,42 @@ if 'new_data' not in st.session_state:
 ```bash
 streamlit run app.py --server.port 8501
 ```
+
+### Docker 部署
+
+1. **配置环境变量**
+   ```bash
+   # 方法1: 使用交互式设置脚本 (推荐)
+   python setup_env.py
+   
+   # 方法2: 手动配置
+   # 复制环境变量模板
+   cp .env.example .env
+   
+   # 编辑 .env 文件，填入实际的配置值
+   nano .env
+   ```
+
+3. **验证配置**
+   ```bash
+   # 验证环境变量配置是否正确
+   python validate_env.py
+   ```
+
+2. **构建和运行容器**
+   ```bash
+   # 构建镜像
+   docker-compose build
+   
+   # 启动服务
+   docker-compose up -d
+   
+   # 查看日志
+   docker-compose logs -f
+   ```
+
+3. **访问应用**
+   打开浏览器访问 `http://localhost:8729`
 
 ### 生产部署
 1. 配置环境变量

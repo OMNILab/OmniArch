@@ -50,10 +50,5 @@ RUN poetry install --no-interaction --no-ansi --no-root --only main
 # Copy application code
 COPY . .
 
-# Streamlit config
-ENV STREAMLIT_SERVER_HEADLESS=true \
-    STREAMLIT_SERVER_ENABLE_CORS=false \
-    STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
-
 # Run the app using the virtual environment
 CMD [".venv/bin/streamlit", "run", "app.py"]
