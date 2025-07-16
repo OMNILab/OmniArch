@@ -25,12 +25,7 @@ class TasksPage:
         if pd.notna(task.get("booking_id")) and task["booking_id"] is not None:
             meeting_match = meetings_df[meetings_df["booking_id"] == task["booking_id"]]
             if len(meeting_match) > 0:
-                title_col = (
-                    "meeting_title"
-                    if "meeting_title" in meetings_df.columns
-                    else "title"
-                )
-                related_meeting = meeting_match.iloc[0][title_col]
+                related_meeting = meeting_match.iloc[0]["meeting_title"]
 
         # Try minute_id if booking_id not found
         if (
@@ -41,12 +36,7 @@ class TasksPage:
             # Try meetings first
             meeting_match = meetings_df[meetings_df["booking_id"] == task["minute_id"]]
             if len(meeting_match) > 0:
-                title_col = (
-                    "meeting_title"
-                    if "meeting_title" in meetings_df.columns
-                    else "title"
-                )
-                related_meeting = meeting_match.iloc[0][title_col]
+                related_meeting = meeting_match.iloc[0]["meeting_title"]
             else:
                 # Try minutes
                 meeting_match = minutes_df[minutes_df["minute_id"] == task["minute_id"]]
@@ -65,9 +55,56 @@ class TasksPage:
         minutes_df = self.data_manager.get_dataframe("minutes")
 
         # Create filter controls
-        col1, col2 = st.columns([1, 1])
+        col1, col2, col3 = st.columns([1, 1, 1])
+
+        # 准备会议过滤器数据
+        meetings_options = ["全部"]
+        meetings_list = []
+        if len(meetings_df) > 0:
+            # 创建会议列表，包含开始时间信息
+            for _, meeting in meetings_df.iterrows():
+                title = meeting.get("meeting_title", "未命名会议")
+                start_time = meeting.get("start_datetime", "")
+
+                # 处理时间格式
+                if start_time:
+                    if hasattr(start_time, "strftime"):
+                        start_time_dt = start_time
+                        start_time_str = start_time.strftime("%m-%d %H:%M")
+                    else:
+                        try:
+                            start_time_dt = pd.to_datetime(start_time)
+                            start_time_str = start_time_dt.strftime("%m-%d %H:%M")
+                        except:
+                            start_time_dt = pd.Timestamp.min
+                            start_time_str = str(start_time)[:10]
+                else:
+                    start_time_dt = pd.Timestamp.min
+                    start_time_str = "时间未知"
+
+                meetings_list.append(
+                    {
+                        "title": title,
+                        "start_time": start_time_dt,
+                        "display_text": f"{title} ({start_time_str})",
+                        "meeting_id": meeting.get("booking_id", meeting.get("id")),
+                    }
+                )
+
+            # 按开始时间逆序排列（最新的在前面）
+            meetings_list.sort(key=lambda x: x["start_time"], reverse=True)
+
+            # 添加到选项列表
+            for meeting_info in meetings_list:
+                meetings_options.append(meeting_info["display_text"])
 
         with col1:
+            # 会议过滤器
+            selected_meeting = st.selectbox(
+                "会议", meetings_options, key="meeting_filter"
+            )
+
+        with col2:
             departments = (
                 ["全部"] + list(tasks_df["department"].unique())
                 if len(tasks_df) > 0
@@ -75,7 +112,7 @@ class TasksPage:
             )
             selected_dept = st.selectbox("部门", departments, key="dept_filter")
 
-        with col2:
+        with col3:
             st.markdown("")
             st.markdown("")
             if st.button("创建任务", type="primary", key="create_task_btn"):
@@ -85,8 +122,28 @@ class TasksPage:
         if st.session_state.get("show_task_dialog", False):
             self._show_task_creation_dialog(meetings_df, minutes_df, users_df)
 
-        # Apply filters - show all tasks since meeting filter is removed
+        # Apply filters
         filtered_tasks = tasks_df
+
+        # Apply meeting filter
+        if selected_meeting != "全部":
+            # 从选中的会议选项中提取会议标题
+            meeting_title = selected_meeting.split(" (")[0]
+
+            # 查找对应的会议ID
+            selected_meeting_id = None
+            for meeting_info in meetings_list:
+                if meeting_info["title"] == meeting_title:
+                    selected_meeting_id = meeting_info["meeting_id"]
+                    break
+
+            if selected_meeting_id:
+                # 过滤与选中会议相关的任务
+                meeting_related_tasks = filtered_tasks[
+                    (filtered_tasks["booking_id"] == selected_meeting_id)
+                    | (filtered_tasks["minute_id"] == selected_meeting_id)
+                ]
+                filtered_tasks = meeting_related_tasks
 
         # Apply department filter
         if selected_dept != "全部":
@@ -391,9 +448,14 @@ class TasksPage:
             """
         **📊 任务管理**:
         - 查看所有任务进展
-        - 按部门筛选
+        - 按会议和部门筛选
         - 甘特图时间线显示
         - 任务状态统计
+        
+        **🔍 筛选功能**:
+        - 会议筛选：显示特定会议的任务
+        - 部门筛选：显示特定部门的任务
+        - 组合筛选：同时按会议和部门筛选
         
         **📅 会议状态**:
         - 实时显示正在进行的会议
