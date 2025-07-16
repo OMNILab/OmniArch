@@ -71,6 +71,7 @@ class MinutesPage:
         self.ui.create_header("会议纪要")
 
         # Minutes statistics
+        st.markdown("### 纪要概览")
         col1, col2, col3, col4 = st.columns(4)
 
         minutes_df = self.data_manager.get_dataframe("minutes")

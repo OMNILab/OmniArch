@@ -21,8 +21,12 @@ class DashboardPage:
         """Data dashboard page implementation with enhanced real-time data"""
         self.ui.create_header("会议统计")
 
+        # 新增：即将到来的会议状态
+        self.ui.show_meeting_status(self.data_manager, limit=5)
+
         # Enhanced overall overview with real data
-        st.markdown("### 整体概览")
+        st.markdown("---")
+        st.markdown("### 统计概览")
 
         dashboard_data = self.data_manager.get_dashboard_data()
 
@@ -47,13 +51,6 @@ class DashboardPage:
             self.ui.create_metric_card(
                 "可用会议室", str(dashboard_data["available_rooms"])
             )
-
-        # 新增：即将到来的会议状态
-        st.markdown("---")
-        st.markdown("### 📅 即将到来的会议")
-
-        # 使用通用的会议状态显示函数
-        self.ui.show_meeting_status(self.data_manager, limit=5)
 
         # Enhanced room usage charts with real data
         st.markdown("---")

@@ -58,29 +58,31 @@ class CalendarPage:
         # 创建房间显示名称列表
         room_options = []
         room_info_map = {}
-        
+
         for _, room in all_rooms.iterrows():
             building_name = self._get_building_name(room.get("building_id", 1))
             room_display_name = f"{building_name}-{room.get('floor', '未知')}楼 {room.get('room_name', room.get('name', '未知'))}"
             room_options.append(room_display_name)
             room_info_map[room_display_name] = {
-                'room_id': room.get("room_id", room.get("id")),
-                'capacity': room.get('capacity', '未知'),
-                'equipment': room.get('equipment_notes', room.get('equipment', '')),
-                'building_name': building_name,
-                'floor': room.get('floor', '未知')
+                "room_id": room.get("room_id", room.get("id")),
+                "capacity": room.get("capacity", "未知"),
+                "equipment": room.get("equipment_notes", room.get("equipment", "")),
+                "building_name": building_name,
+                "floor": room.get("floor", "未知"),
             }
 
         # 使用容器创建更好的布局
         with st.container():
             st.markdown("### 🔍 会议室筛选")
-            
+
             # 创建两列布局
             col1, col2 = st.columns([1, 2])
-            
+
             with col1:
-                show_all = st.checkbox("📋 显示所有会议室", value=True, help="勾选后默认选择所有会议室")
-            
+                show_all = st.checkbox(
+                    "📋 显示所有会议室", value=True, help="勾选后默认选择所有会议室"
+                )
+
             with col2:
                 if show_all:
                     selected_rooms = st.multiselect(
@@ -88,14 +90,14 @@ class CalendarPage:
                         options=room_options,
                         default=room_options,
                         help="可以选择一个或多个会议室进行查看",
-                        placeholder="请选择会议室..."
+                        placeholder="请选择会议室...",
                     )
                 else:
                     selected_rooms = st.multiselect(
                         "选择要显示的会议室",
                         options=room_options,
                         help="可以选择一个或多个会议室进行查看",
-                        placeholder="请选择会议室..."
+                        placeholder="请选择会议室...",
                     )
 
         # 转换为房间ID列表
@@ -104,7 +106,7 @@ class CalendarPage:
 
         for room_display_name in selected_rooms:
             if room_display_name in room_info_map:
-                room_id = room_info_map[room_display_name]['room_id']
+                room_id = room_info_map[room_display_name]["room_id"]
                 selected_room_ids.append(room_id)
                 room_name_map[room_id] = room_display_name
 
@@ -177,48 +179,62 @@ class CalendarPage:
 
     def render_calendar(self, calendar_events):
         """渲染日历组件"""
-        st.markdown("### 📅 会议室日历")
+        # 使用容器创建更好的布局
+        with st.container():
+            st.markdown("### 📅 会议室日历")
 
-        # 日历选项配置
-        calendar_options = {
-            "editable": False,
-            "selectable": True,
-            "headerToolbar": {
-                "left": "prev,next today",
-                "center": "title",
-                "right": "dayGridMonth,timeGridWeek,timeGridDay",
-            },
-            "initialView": "timeGridWeek",  # 默认周视图
-            "height": 650,
-            "slotMinTime": "08:00:00",
-            "slotMaxTime": "20:00:00",
-            "locale": "zh-cn",
-            "timeZone": "Asia/Shanghai",
-            "businessHours": {
-                "startTime": "09:00",
-                "endTime": "18:00",
-                "daysOfWeek": [1, 2, 3, 4, 5],  # 周一到周五
-            },
-        }
+            # 添加日历说明
+            if calendar_events:
+                st.info(
+                    f"📊 当前显示 {len(calendar_events)} 个预订事件，不同颜色代表不同会议室"
+                )
+            else:
+                st.info("📝 当前时间段内暂无预订事件")
 
-        # 渲染日历
-        calendar_result = calendar(
-            events=calendar_events,
-            options=calendar_options,
-            custom_css="""
-            .fc-event-title {
-                font-weight: bold;
+            # 日历选项配置
+            calendar_options = {
+                "editable": False,
+                "selectable": True,
+                "headerToolbar": {
+                    "left": "prev,next today",
+                    "center": "title",
+                    "right": "dayGridMonth,timeGridWeek,timeGridDay",
+                },
+                "initialView": "timeGridWeek",  # 默认周视图
+                "height": 650,
+                "slotMinTime": "08:00:00",
+                "slotMaxTime": "20:00:00",
+                "locale": "zh-cn",
+                "timeZone": "Asia/Shanghai",
+                "businessHours": {
+                    "startTime": "09:00",
+                    "endTime": "18:00",
+                    "daysOfWeek": [1, 2, 3, 4, 5],  # 周一到周五
+                },
             }
-            .fc-event-time {
-                font-style: italic;
-            }
-            """,
-        )
 
-        # 显示点击事件信息（如果有）
-        if calendar_result.get("eventClick"):
-            event_data = calendar_result["eventClick"]["event"]
-            st.info(f"📋 预订详情: {event_data.get('title', '未知')}")
+            # 渲染日历
+            calendar_result = calendar(
+                events=calendar_events,
+                options=calendar_options,
+                custom_css="""
+                .fc-event-title {
+                    font-weight: bold;
+                }
+                .fc-event-time {
+                    font-style: italic;
+                }
+                .fc-event {
+                    border-radius: 4px;
+                    margin: 1px;
+                }
+                """,
+            )
+
+            # 显示点击事件信息（如果有）
+            if calendar_result.get("eventClick"):
+                event_data = calendar_result["eventClick"]["event"]
+                st.success(f"📋 预订详情: {event_data.get('title', '未知')}")
 
     def render_statistics(self, bookings, selected_room_ids, room_name_map):
         """渲染统计信息"""
@@ -228,7 +244,7 @@ class CalendarPage:
         # 使用容器创建更好的布局
         with st.container():
             st.markdown("### 📊 统计概览")
-            
+
             # 创建四列布局
             col1, col2, col3, col4 = st.columns(4)
 
@@ -286,6 +302,21 @@ class CalendarPage:
             """
             )
 
+            st.markdown("### 💡 使用技巧")
+            st.markdown(
+                """
+            **📱 操作指南**
+            - 点击事件查看详情
+            - 拖拽切换视图
+            - 筛选特定会议室
+            
+            **🎯 快速操作**
+            - 使用筛选器快速定位
+            - 切换视图查看不同时间范围
+            - 点击今日按钮回到当前时间
+            """
+            )
+
     def show(self):
         """显示会议室日历页面"""
         self.ui.create_header("🗓️ 会议室日历")
@@ -311,6 +342,9 @@ class CalendarPage:
             st.info("📝 请选择至少一个会议室来查看日历")
             return
 
+        # 渲染统计信息（移到顶部）
+        self.render_statistics(all_bookings, selected_room_ids, room_name_map)
+
         st.markdown("---")
 
         # 格式化日历事件
@@ -323,12 +357,9 @@ class CalendarPage:
 
         st.markdown("---")
 
-        # 渲染统计信息
-        self.render_statistics(all_bookings, selected_room_ids, room_name_map)
-
         # 显示房间列表
         st.markdown("### 🏢 会议室详情")
-        
+
         # 使用网格布局显示会议室信息
         cols = st.columns(3)
         for idx, room_id in enumerate(selected_room_ids):
@@ -336,7 +367,7 @@ class CalendarPage:
             if not room.empty:
                 room = room.iloc[0]
                 col_idx = idx % 3
-                
+
                 with cols[col_idx]:
                     # 创建会议室卡片
                     with st.container():
@@ -364,5 +395,5 @@ class CalendarPage:
                                 </div>
                             </div>
                             """,
-                            unsafe_allow_html=True
+                            unsafe_allow_html=True,
                         )

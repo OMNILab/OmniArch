@@ -94,12 +94,9 @@ class TasksPage:
                 filtered_tasks["department"] == selected_dept
             ]
 
-        # Show meeting status information
-        st.markdown("---")
-        st.markdown("### 📅 即将到来的会议")
-        self.ui.show_meeting_status(self.data_manager, limit=3)
-
         # Show statistics
+        st.markdown("---")
+        st.markdown("### 任务统计")
         self._show_task_statistics(filtered_tasks)
 
         # Show task progress
@@ -222,9 +219,6 @@ class TasksPage:
 
     def _show_task_statistics(self, filtered_tasks):
         """Show task statistics charts"""
-        st.markdown("---")
-        st.markdown("### 任务统计")
-
         col1, col2 = st.columns(2)
 
         with col1:
