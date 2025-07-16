@@ -7,8 +7,8 @@ import streamlit as st
 import pandas as pd
 import os
 from smartmeeting.tools import (
-    transcribe_file,
     generate_minutes_from_text,
+    transcribe_file,
     extract_transcription_text,
 )
 
@@ -580,3 +580,20 @@ class MinutesPage:
                 st.info("没有找到符合条件的会议纪要")
         else:
             st.info("暂无会议纪要")
+
+        # 侧边栏功能说明
+        st.sidebar.markdown("### 📝 功能说明")
+        st.sidebar.markdown(
+            """
+        **📋 会议纪要管理**:
+        - 查看所有会议纪要
+        - 按状态、与会人筛选
+        - 确认和发布纪要
+        - 查看详细内容
+        
+        **🎨 状态说明**:
+        - 草稿：待完善
+        - 已确认：内容已确认
+        - 已发布：正式发布
+        """
+        )

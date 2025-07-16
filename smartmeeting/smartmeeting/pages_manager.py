@@ -7,6 +7,7 @@ import streamlit as st
 from .pages import (
     LoginPage,
     BookingPage,
+    CalendarPage,
     MinutesPage,
     TasksPage,
     DashboardPage,
@@ -27,6 +28,7 @@ class Pages:
         # Initialize individual page classes
         self.login_page = LoginPage(data_manager, auth_manager, ui_components)
         self.booking_page = BookingPage(data_manager, auth_manager, ui_components)
+        self.calendar_page = CalendarPage(data_manager, auth_manager, ui_components)
         self.minutes_page = MinutesPage(data_manager, auth_manager, ui_components)
         self.tasks_page = TasksPage(data_manager, auth_manager, ui_components)
         self.dashboard_page = DashboardPage(data_manager, auth_manager, ui_components)
@@ -53,6 +55,10 @@ class Pages:
     def show_booking_page(self):
         """Show the booking page"""
         return self.booking_page.show()
+
+    def show_calendar_page(self):
+        """Show the calendar page"""
+        return self.calendar_page.show()
 
     def show_minutes_page(self):
         """Show the minutes page"""

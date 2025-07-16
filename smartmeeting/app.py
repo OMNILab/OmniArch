@@ -40,8 +40,33 @@ def main():
 
     # Sidebar navigation
     with st.sidebar:
-        st.markdown(f"欢迎，{current_user['name']}")
-        st.markdown(f"角色：{current_user['role']}")
+        # Enhanced user information display
+        st.markdown("### 👤 用户信息")
+        if current_user:
+            user_id = current_user.get("id", 0)
+            username = current_user.get("name", "用户")
+            role = current_user.get("role", "会议参与者")
+            department = current_user.get("department", "未分配")
+            email = current_user.get("email", "")
+
+            # Create a nice info box for user details
+            user_info = f"""
+            **👤 用户**: {username}  
+            **🆔 ID**: {user_id}  
+            **🎭 角色**: {role}  
+            **🏢 部门**: {department}
+            """
+            if email:
+                user_info += f"**📧 邮箱**: {email}"
+
+            st.info(user_info)
+        else:
+            st.warning("未获取到用户信息")
+
+        # 退出登录按钮 - 放在用户信息下方
+        if st.button("🚪 退出登录", use_container_width=True, type="secondary"):
+            auth_manager.logout()
+            st.rerun()
 
         st.markdown("---")
 
@@ -52,6 +77,9 @@ def main():
         # Navigation buttons
         if st.button("🏢 智能预定", use_container_width=True):
             st.session_state.current_page = "智能预定"
+
+        if st.button("🗓️ 会议室日历", use_container_width=True):
+            st.session_state.current_page = "会议室日历"
 
         if st.button("📝 会议纪要", use_container_width=True):
             st.session_state.current_page = "会议纪要"
@@ -68,17 +96,13 @@ def main():
         if st.button("⚙️ 系统设置", use_container_width=True):
             st.session_state.current_page = "系统设置"
 
-        st.markdown("---")
-
-        if st.button("退出登录"):
-            auth_manager.logout()
-            st.rerun()
-
     # Main content area
     page = st.session_state.current_page
 
     if page == "智能预定":
         pages.show_booking_page()
+    elif page == "会议室日历":
+        pages.show_calendar_page()
     elif page == "会议纪要":
         pages.show_minutes_page()
     elif page == "任务看板":

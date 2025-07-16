@@ -20,12 +20,17 @@ class UIComponents:
             font-size: 2.5rem;
             font-weight: 700;
             color: #1f2937;
-            margin-bottom: 2rem;
+            margin-bottom: 5rem;
             text-align: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: white;
+            padding: 2.5rem 2rem 2rem 2rem;
+            margin-left: -2rem;
+            margin-right: -2rem;
+            width: calc(100% + 4rem);
+            box-sizing: border-box;
         }
         
         .metric-card {
@@ -161,10 +166,21 @@ class UIComponents:
             overflow: hidden;
         }
         
+        /* Page content spacing for fixed header */
+        .main .block-container {
+            padding-top: 3rem;
+        }
+        
+        /* Ensure header spans full width */
+        .main-header {
+            box-sizing: border-box;
+        }
+        
         /* Responsive design */
         @media (max-width: 768px) {
             .main-header {
                 font-size: 2rem;
+                padding: 1.5rem 0.5rem 1rem 0.5rem;
             }
             
             .metric-card {
