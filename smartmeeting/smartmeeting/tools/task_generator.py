@@ -4,6 +4,7 @@ Contains functions for converting action items from meeting minutes to specific 
 """
 
 import json
+import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from smartmeeting.tools.llm import setup_chat_llm
@@ -48,7 +49,12 @@ def generate_tasks_from_action_items(
         )
         # 校验并修复fallback任务
         return validate_tasks_batch(
-            fallback_tasks, meeting_title, meeting_id, default_assignee, users_df
+            fallback_tasks,
+            meeting_title,
+            meeting_id,
+            default_assignee,
+            users_df,
+            meeting_data,
         )
 
     try:
@@ -75,7 +81,7 @@ def generate_tasks_from_action_items(
 
         # 校验并修复生成的任务
         validated_tasks = validate_tasks_batch(
-            tasks, meeting_title, meeting_id, default_assignee, users_df
+            tasks, meeting_title, meeting_id, default_assignee, users_df, meeting_data
         )
 
         return validated_tasks
@@ -87,7 +93,12 @@ def generate_tasks_from_action_items(
         )
         # 校验并修复fallback任务
         return validate_tasks_batch(
-            fallback_tasks, meeting_title, meeting_id, default_assignee, users_df
+            fallback_tasks,
+            meeting_title,
+            meeting_id,
+            default_assignee,
+            users_df,
+            meeting_data,
         )
 
 
@@ -113,9 +124,10 @@ def _create_task_generation_prompt(
 请为每个行动项生成一个具体的任务，包含以下信息：
 1. 任务名称：具体、明确的任务标题
 2. 负责人：从与会人员中选择合适的人选，如果没有明确指定，请根据任务性质合理分配
-3. 截止日期：根据任务复杂度和紧急程度设定合理的截止日期（如果无法确定，默认为7天后）
-4. 优先级：高、中、低（如果无法确定，默认为中）
-5. 任务描述：详细的任务说明
+3. 开始时间：任务开始的时间（如果无法确定，请留空）
+4. 截止日期：根据任务复杂度和紧急程度设定合理的截止日期（如果无法确定，默认为7天后）
+5. 优先级：高、中、低（如果无法确定，默认为中）
+6. 任务描述：详细的任务说明
 
 请以JSON格式返回，格式如下：
 [
@@ -123,6 +135,7 @@ def _create_task_generation_prompt(
         "title": "任务名称",
         "description": "任务描述",
         "assignee_name": "负责人姓名",
+        "start_time": "2025-01-20 09:00:00",
         "priority": "高/中/低",
         "deadline_days": 7,
         "estimated_hours": 8
@@ -132,6 +145,7 @@ def _create_task_generation_prompt(
 注意：
 - 任务名称要具体明确
 - 负责人必须是与会人员之一
+- 开始时间格式为"YYYY-MM-DD HH:MM:SS"，如果无法确定请留空
 - 截止日期用天数表示（从今天开始计算）
 - 优先级根据任务重要性和紧急程度确定
 - 预估工时根据任务复杂度确定
@@ -151,6 +165,7 @@ def _parse_llm_response(content: str, meeting_id: str) -> List[Dict[str, Any]]:
             print("No valid JSON found in LLM response")
             return []
 
+        print(content[start_idx:end_idx])
         json_str = content[start_idx:end_idx]
         tasks_data = json.loads(json_str)
 
@@ -161,6 +176,7 @@ def _parse_llm_response(content: str, meeting_id: str) -> List[Dict[str, Any]]:
                 "title": task_data.get("title", "未命名任务"),
                 "description": task_data.get("description", ""),
                 "assignee_name": task_data.get("assignee_name", "未分配"),
+                "start_time": task_data.get("start_time", ""),
                 "priority": task_data.get("priority", "中"),
                 "deadline_days": task_data.get("deadline_days", 7),
                 "estimated_hours": task_data.get("estimated_hours", 8),
@@ -203,6 +219,7 @@ def _generate_fallback_tasks(
             "title": f"{action_item[:30]}{'...' if len(action_item) > 30 else ''}",
             "description": action_item,
             "assignee_name": assignee,
+            "start_time": "",
             "priority": "中",
             "deadline_days": 7,
             "estimated_hours": 8,
@@ -267,6 +284,7 @@ def validate_and_fix_task(
     meeting_id: str,
     default_assignee: str = "未分配",
     users_df=None,
+    meeting_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     校验并修复任务字段，确保包含必需字段并设置合理的默认值
@@ -308,7 +326,48 @@ def validate_and_fix_task(
     validated_task["assignee_id"] = assignee_id
     validated_task["department_id"] = department_id
 
-    # 3. 截止日期 - 必需字段，如果无法获取则默认为7天
+    # 3. 开始时间处理 - 如果LLM未能解析出start_time，默认为会议开始时间
+    start_time = validated_task.get("start_time", "")
+    if not start_time or not start_time.strip():
+        # 如果start_time为空，使用会议开始时间
+        if meeting_data and meeting_data.get("start_datetime"):
+            try:
+                # 解析会议开始时间
+                meeting_start = pd.to_datetime(meeting_data["start_datetime"])
+                validated_task["start_time"] = meeting_start.strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+            except:
+                # 如果解析失败，使用当前时间
+                validated_task["start_time"] = datetime.now().strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+        else:
+            # 如果没有会议数据，使用当前时间
+            validated_task["start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        # 如果LLM提供了start_time，验证格式
+        try:
+            pd.to_datetime(start_time)
+            validated_task["start_time"] = start_time
+        except:
+            # 如果格式不正确，使用会议开始时间或当前时间
+            if meeting_data and meeting_data.get("start_datetime"):
+                try:
+                    meeting_start = pd.to_datetime(meeting_data["start_datetime"])
+                    validated_task["start_time"] = meeting_start.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                except:
+                    validated_task["start_time"] = datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+            else:
+                validated_task["start_time"] = datetime.now().strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+    # 4. 截止日期 - 必需字段，如果无法获取则默认为7天
     deadline_days = validated_task.get("deadline_days", 7)
     if not isinstance(deadline_days, (int, float)) or deadline_days <= 0:
         deadline_days = 7
@@ -318,17 +377,23 @@ def validate_and_fix_task(
     deadline_date = datetime.now() + timedelta(days=deadline_days)
     validated_task["deadline"] = deadline_date.strftime("%Y-%m-%d")
 
-    # 4. 关联会议 - 必需字段
+    # 确保deadline字段不为空
+    if not validated_task["deadline"] or validated_task["deadline"].strip() == "":
+        validated_task["deadline"] = (datetime.now() + timedelta(days=7)).strftime(
+            "%Y-%m-%d"
+        )
+
+    # 5. 关联会议 - 必需字段
     if not validated_task.get("booking_id"):
         validated_task["booking_id"] = meeting_id
 
-    # 5. 优先级 - 如果无法获取则默认为中
+    # 6. 优先级 - 如果无法获取则默认为中
     priority = validated_task.get("priority", "中")
     if priority not in ["高", "中", "低"]:
         priority = "中"
     validated_task["priority"] = priority
 
-    # 6. 其他字段的默认值设置
+    # 7. 其他字段的默认值设置
     if not validated_task.get("description"):
         validated_task["description"] = validated_task["title"]
 
@@ -338,14 +403,14 @@ def validate_and_fix_task(
     if not validated_task.get("estimated_hours"):
         validated_task["estimated_hours"] = 8
 
-    # 7. 时间戳字段
+    # 8. 时间戳字段
     current_time = datetime.now()
     if not validated_task.get("created_datetime"):
         validated_task["created_datetime"] = current_time
     if not validated_task.get("updated_datetime"):
         validated_task["updated_datetime"] = current_time
 
-    # 8. 移除不需要的字段，保持与现有数据结构一致
+    # 9. 移除不需要的字段，保持与现有数据结构一致
     if "assignee_name" in validated_task:
         del validated_task["assignee_name"]
 
@@ -358,6 +423,7 @@ def validate_tasks_batch(
     meeting_id: str,
     default_assignee: str = "未分配",
     users_df=None,
+    meeting_data: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     批量校验和修复任务列表
@@ -376,7 +442,7 @@ def validate_tasks_batch(
 
     for task in tasks:
         validated_task = validate_and_fix_task(
-            task, meeting_title, meeting_id, default_assignee, users_df
+            task, meeting_title, meeting_id, default_assignee, users_df, meeting_data
         )
         validated_tasks.append(validated_task)
 

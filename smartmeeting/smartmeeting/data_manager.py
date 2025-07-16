@@ -127,9 +127,14 @@ class DataManager:
                 )
                 tasks_df = tasks_df.rename(columns={"department_name": "department"})
             if "deadline" in tasks_df.columns:
-                tasks_df["deadline"] = pd.to_datetime(
-                    tasks_df["deadline"], errors="coerce"
-                )
+                # 处理空字符串的deadline字段
+                tasks_df["deadline"] = tasks_df["deadline"].fillna("")
+                # 只转换非空字符串为datetime
+                mask = (tasks_df["deadline"] != "") & (tasks_df["deadline"].notna())
+                if mask.any():
+                    tasks_df.loc[mask, "deadline"] = pd.to_datetime(
+                        tasks_df.loc[mask, "deadline"], errors="coerce"
+                    )
             if "created_datetime" in tasks_df.columns:
                 tasks_df["created_datetime"] = pd.to_datetime(
                     tasks_df["created_datetime"], errors="coerce"

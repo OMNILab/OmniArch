@@ -364,10 +364,15 @@ class TasksPage:
                     start_date = pd.to_datetime(start_date)
 
                 end_date = task.get("deadline")
-                if end_date is None:
+                if end_date is None or (
+                    isinstance(end_date, str) and end_date.strip() == ""
+                ):
                     end_date = start_date + timedelta(days=7)
                 elif isinstance(end_date, str):
-                    end_date = pd.to_datetime(end_date)
+                    try:
+                        end_date = pd.to_datetime(end_date)
+                    except:
+                        end_date = start_date + timedelta(days=7)
 
                 gantt_data.append(
                     {
@@ -446,13 +451,33 @@ class TasksPage:
                     task, meetings_df, minutes_df
                 )
 
+                # 处理deadline字段，确保格式一致
+                deadline = task["deadline"]
+                if deadline is None or (
+                    isinstance(deadline, str) and deadline.strip() == ""
+                ):
+                    deadline_display = "未设置"
+                elif hasattr(deadline, "strftime"):
+                    # 如果是datetime对象
+                    deadline_display = deadline.strftime("%Y-%m-%d")
+                elif isinstance(deadline, str):
+                    # 如果是字符串，尝试解析
+                    try:
+                        deadline_dt = pd.to_datetime(deadline)
+                        deadline_display = deadline_dt.strftime("%Y-%m-%d")
+                    except:
+                        # 如果解析失败，直接显示原字符串（不超过10个字符）
+                        deadline_display = str(deadline)
+                else:
+                    deadline_display = str(deadline)
+
                 display_data.append(
                     {
                         "任务": task["title"],
                         "负责人": assignee,
                         "状态": task["status"],
                         "优先级": task["priority"],
-                        "截止日期": task["deadline"],
+                        "截止日期": deadline_display,
                         "关联会议": related_meeting,
                     }
                 )
