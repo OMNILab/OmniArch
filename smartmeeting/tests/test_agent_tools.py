@@ -157,7 +157,7 @@ class TestAgentTools:
         result = recommend_available_rooms(start_time, end_time, capacity)
 
         # Should not return room 1 (has conflict)
-        room_ids = [room["id"] for room in result]
+        room_ids = [room["room_id"] for room in result]
         assert 1 not in room_ids
 
     @patch("smartmeeting.agent.tools.DataManager")

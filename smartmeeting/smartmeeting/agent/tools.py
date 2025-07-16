@@ -72,23 +72,44 @@ def recommend_available_rooms(
 
         # 检查设备需求
         if equipment_needs:
-            room_equipment = room.get("equipment", "")
-            if not all(equip in room_equipment for equip in equipment_needs):
+            equipment_available = True
+            for equip in equipment_needs:
+                if equip == "投影仪" and room.get("has_projector", 0) != 1:
+                    equipment_available = False
+                    break
+                elif equip == "视频会议" and room.get("has_phone", 0) != 1:
+                    equipment_available = False
+                    break
+                elif equip == "白板" and room.get("has_whiteboard", 0) != 1:
+                    equipment_available = False
+                    break
+                elif equip == "显示屏" and room.get("has_screen", 0) != 1:
+                    equipment_available = False
+                    break
+            if not equipment_available:
                 continue
 
         # 检查位置偏好
         if preferred_location:
-            room_building = room.get("building", "")
-            if not any(loc in room_building for loc in preferred_location):
-                continue
+            # 获取建筑信息
+            buildings_df = data_manager.get_dataframe("buildings")
+            room_building_id = room.get("building_id")
+            if room_building_id is not None:
+                building_info = buildings_df[
+                    buildings_df["building_id"] == room_building_id
+                ]
+                if not building_info.empty:
+                    building_name = building_info.iloc[0]["building_name"]
+                    if not any(loc in building_name for loc in preferred_location):
+                        continue
 
         # 检查时间冲突
-        room_meetings = meetings_df[meetings_df["room_id"] == room["id"]]
+        room_meetings = meetings_df[meetings_df["room_id"] == room["room_id"]]
         is_available = True
 
         for _, meeting in room_meetings.iterrows():
-            meeting_start = pd.to_datetime(meeting["start_time"])
-            meeting_end = pd.to_datetime(meeting["end_time"])
+            meeting_start = pd.to_datetime(meeting["start_datetime"])
+            meeting_end = pd.to_datetime(meeting["end_datetime"])
 
             # 检查时间重叠
             if not (end_dt <= meeting_start or start_dt >= meeting_end):
@@ -219,7 +240,7 @@ def lookup_user_bookings(user_id: int) -> List[dict]:
     # 只返回当前和未来的预订
     current_time = datetime.now()
     future_meetings = user_meetings[
-        pd.to_datetime(user_meetings["start_time"]) > current_time
+        pd.to_datetime(user_meetings["start_datetime"]) > current_time
     ]
 
     return future_meetings.to_dict("records")
