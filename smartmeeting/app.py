@@ -35,6 +35,82 @@ def main():
         pages.show_login_page()
         return
 
+    # 新增：会议状态通知系统
+    def show_meeting_notifications():
+        """显示会议状态通知"""
+        # 更新会议状态
+        data_manager.update_meeting_statuses()
+
+        # 获取即将到来的会议（1小时内）
+        upcoming_meetings = data_manager.get_upcoming_meetings(limit=10)
+        ongoing_meetings = data_manager.get_ongoing_meetings()
+
+        notifications = []
+
+        # 检查即将到来的会议（1小时内）
+        import pandas as pd
+
+        current_time = pd.Timestamp.now()
+
+        for meeting in upcoming_meetings:
+            start_time = pd.to_datetime(
+                meeting.get("start_datetime") or meeting.get("start_time")
+            )
+            if pd.notna(start_time):
+                time_diff = start_time - current_time
+                hours_until = time_diff.total_seconds() / 3600
+
+                if 0 < hours_until <= 1:  # 1小时内
+                    title = meeting.get("meeting_title") or meeting.get(
+                        "title", "未命名会议"
+                    )
+                    room_id = meeting.get("room_id", "未知")
+
+                    # 获取房间名称
+                    rooms_df = data_manager.get_dataframe("rooms")
+                    room_info = rooms_df[rooms_df["id"] == room_id]
+                    room_name = (
+                        room_info.iloc[0]["name"]
+                        if not room_info.empty
+                        else f"会议室{room_id}"
+                    )
+
+                    minutes_until = int(hours_until * 60)
+                    notifications.append(
+                        {
+                            "type": "warning",
+                            "message": f"⚠️ 会议即将开始：{title} - {room_name} (还有{minutes_until}分钟)",
+                        }
+                    )
+
+        # 检查正在进行的会议
+        for meeting in ongoing_meetings:
+            title = meeting.get("meeting_title") or meeting.get("title", "未命名会议")
+            room_id = meeting.get("room_id", "未知")
+
+            # 获取房间名称
+            rooms_df = data_manager.get_dataframe("rooms")
+            room_info = rooms_df[rooms_df["id"] == room_id]
+            room_name = (
+                room_info.iloc[0]["name"] if not room_info.empty else f"会议室{room_id}"
+            )
+
+            notifications.append(
+                {"type": "info", "message": f"🔄 会议进行中：{title} - {room_name}"}
+            )
+
+        # 显示通知
+        if notifications:
+            st.markdown("### 🔔 会议通知")
+            for notification in notifications[:3]:  # 最多显示3个通知
+                if notification["type"] == "warning":
+                    st.warning(notification["message"])
+                elif notification["type"] == "info":
+                    st.info(notification["message"])
+
+    # 显示会议通知
+    show_meeting_notifications()
+
     # Main application layout
     current_user = auth_manager.get_current_user()
 

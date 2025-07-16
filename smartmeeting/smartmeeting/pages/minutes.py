@@ -120,9 +120,17 @@ class MinutesPage:
             )
 
             meeting_options = []
-            for _, row in meetings_df.iterrows():
+            meeting_status_info = []  # 存储会议状态信息
+
+            # 按开始时间逆序排序
+            meetings_df_sorted = meetings_df.sort_values(time_col, ascending=False)
+
+            for _, row in meetings_df_sorted.iterrows():
                 title = row.get(title_col, "未命名会议")
                 start_time = row.get(time_col, "未知时间")
+                meeting_status = row.get(
+                    "meeting_status", "upcoming"
+                )  # 获取会议执行状态
 
                 # Format datetime if it's a datetime object
                 if pd.notna(start_time):
@@ -133,20 +141,44 @@ class MinutesPage:
                 else:
                     start_time = "未知时间"
 
-                meeting_options.append(f"{title} - {start_time}")
+                # 根据会议状态添加标识
+                status_icon = (
+                    "🕐"
+                    if meeting_status == "upcoming"
+                    else "🔄" if meeting_status == "ongoing" else "✅"
+                )
+                status_text = (
+                    "未进行"
+                    if meeting_status == "upcoming"
+                    else "进行中" if meeting_status == "ongoing" else "已完成"
+                )
+
+                meeting_options.append(
+                    f"{status_icon} {title} - {start_time} ({status_text})"
+                )
+                meeting_status_info.append(meeting_status)
 
             if len(meeting_options) > 0:
                 selected_meeting_option = st.selectbox("选择会议", meeting_options)
-                selected_meeting_id = meetings_df.iloc[
-                    meeting_options.index(selected_meeting_option)
-                ]["id"]
-                selected_meeting_title = meetings_df.iloc[
-                    meeting_options.index(selected_meeting_option)
-                ][title_col]
+                selected_index = meeting_options.index(selected_meeting_option)
+                selected_meeting_id = meetings_df_sorted.iloc[selected_index]["id"]
+                selected_meeting_title = meetings_df_sorted.iloc[selected_index][
+                    title_col
+                ]
+                selected_meeting_status = meeting_status_info[selected_index]
+
+                # 显示会议状态警告
+                if selected_meeting_status == "upcoming":
+                    st.warning("⚠️ 该会议还未进行，建议在会议结束后再生成纪要")
+                elif selected_meeting_status == "ongoing":
+                    st.info("🔄 该会议正在进行中，可以实时生成纪要")
+                else:
+                    st.success("✅ 该会议已完成，可以生成完整纪要")
             else:
                 st.warning("暂无会议记录")
                 selected_meeting_id = None
                 selected_meeting_title = None
+                selected_meeting_status = None
         else:
             # Create new meeting
             col1, col2 = st.columns(2)

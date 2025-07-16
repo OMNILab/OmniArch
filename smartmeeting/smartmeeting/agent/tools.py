@@ -129,26 +129,57 @@ def book_room(
         # 获取数据管理器
         data_manager = DataManager()
 
-        # 创建新会议记录
+        # 计算会议时长（分钟）
+        start_dt = pd.to_datetime(start_time)
+        end_dt = pd.to_datetime(end_time)
+        duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
+
+        # 获取房间信息
+        rooms_df = data_manager.get_dataframe("rooms")
+        room_info = rooms_df[rooms_df["id"] == room_id]
+        room_name = (
+            room_info.iloc[0]["name"] if not room_info.empty else f"会议室{room_id}"
+        )
+
+        # 获取用户信息
+        users_df = data_manager.get_dataframe("users")
+        user_info = users_df[users_df["id"] == user_id]
+        organizer_name = (
+            user_info.iloc[0]["name"] if not user_info.empty else f"用户{user_id}"
+        )
+
+        # 创建新会议记录 - 同步到所有相关页面
         new_meeting = {
-            "title": title,
+            "id": len(data_manager.get_dataframe("meetings")) + 1,
+            "booking_id": len(data_manager.get_dataframe("meetings")) + 1,
             "room_id": room_id,
             "organizer_id": user_id,
-            "start_time": start_time,
-            "end_time": end_time,
-            "start_datetime": start_time,  # 确保与日历页面兼容
-            "end_datetime": end_time,  # 确保与日历页面兼容
-            "duration": 60,  # 默认60分钟
-            "participants": 10,  # 默认10人
-            "type": "项目讨论",  # 默认类型
-            "status": "已确认",
+            "meeting_title": title,
+            "title": title,  # 确保与minutes页面兼容
+            "meeting_type": "项目讨论",
+            "start_datetime": start_time,
+            "end_datetime": end_time,
+            "start_time": start_time,  # 确保与calendar页面兼容
+            "end_time": end_time,  # 确保与calendar页面兼容
+            "duration_minutes": duration_minutes,
+            "duration": duration_minutes,  # 兼容字段
+            "participant_count": 10,  # 默认值
+            "participants": 10,  # 兼容字段
+            "status": "已确认",  # 会议状态：已确认、进行中、已完成、已取消
+            "meeting_status": "upcoming",  # 新增：会议执行状态：upcoming, ongoing, completed
+            "created_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "natural_language_request": f"通过AI助手预订的会议: {title}",
+            "ai_match_score": 95,
+            "notes": f"会议组织者: {organizer_name}，会议室: {room_name}",
             "description": f"通过AI助手预订的会议: {title}",
+            "type": "项目讨论",  # 兼容字段
         }
 
         # 添加到数据管理器
         data_manager.add_meeting(new_meeting)
 
-        return f"预订成功！会议主题: {title}，会议室ID: {room_id}，时间: {start_time} 到 {end_time}。"
+        return f"预订成功！会议主题: {title}，会议室: {room_name}，时间: {start_time} 到 {end_time}，时长: {duration_minutes}分钟。会议已同步到所有相关页面。"
     except Exception as e:
         return f"预订失败，发生错误: {e}"
 

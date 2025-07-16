@@ -445,3 +445,62 @@ class DataManager:
             requirements = [r for r in requirements if r["status"] == status]
 
         return requirements
+
+    def update_meeting_statuses(self):
+        """自动更新会议状态基于当前时间"""
+        current_time = datetime.now()
+
+        for meeting in st.session_state.mock_data["meetings"]:
+            start_time = pd.to_datetime(
+                meeting.get("start_datetime") or meeting.get("start_time")
+            )
+            end_time = pd.to_datetime(
+                meeting.get("end_datetime") or meeting.get("end_time")
+            )
+
+            if pd.notna(start_time) and pd.notna(end_time):
+                if current_time < start_time:
+                    meeting["meeting_status"] = "upcoming"
+                elif start_time <= current_time <= end_time:
+                    meeting["meeting_status"] = "ongoing"
+                else:
+                    meeting["meeting_status"] = "completed"
+
+    def get_upcoming_meetings(self, limit=10):
+        """获取即将到来的会议列表"""
+        self.update_meeting_statuses()
+        meetings_df = self.get_dataframe("meetings")
+
+        # 筛选即将到来的会议
+        upcoming_meetings = meetings_df[meetings_df["meeting_status"] == "upcoming"]
+
+        # 按开始时间排序
+        if len(upcoming_meetings) > 0:
+            upcoming_meetings = upcoming_meetings.sort_values("start_datetime")
+
+        return upcoming_meetings.head(limit).to_dict("records")
+
+    def get_ongoing_meetings(self):
+        """获取正在进行的会议列表"""
+        self.update_meeting_statuses()
+        meetings_df = self.get_dataframe("meetings")
+
+        return meetings_df[meetings_df["meeting_status"] == "ongoing"].to_dict(
+            "records"
+        )
+
+    def get_completed_meetings(self, limit=10):
+        """获取已完成的会议列表"""
+        self.update_meeting_statuses()
+        meetings_df = self.get_dataframe("meetings")
+
+        # 筛选已完成的会议
+        completed_meetings = meetings_df[meetings_df["meeting_status"] == "completed"]
+
+        # 按开始时间倒序排序
+        if len(completed_meetings) > 0:
+            completed_meetings = completed_meetings.sort_values(
+                "start_datetime", ascending=False
+            )
+
+        return completed_meetings.head(limit).to_dict("records")

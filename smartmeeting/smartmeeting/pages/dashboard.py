@@ -62,18 +62,99 @@ class DashboardPage:
 
         with col2:
             self.ui.create_metric_card(
-                "平均时长", f"{dashboard_data['avg_meeting_duration']:.0f}分钟"
+                "今日会议", str(dashboard_data["meetings_today"])
             )
 
         with col3:
             self.ui.create_metric_card(
-                "已完成任务", str(dashboard_data["completed_tasks"])
+                "完成任务", str(dashboard_data["completed_tasks"])
             )
 
         with col4:
             self.ui.create_metric_card(
                 "可用会议室", str(dashboard_data["available_rooms"])
             )
+
+        # 新增：即将到来的会议状态
+        st.markdown("---")
+        st.markdown("### 📅 即将到来的会议")
+
+        # 获取即将到来的会议
+        upcoming_meetings = self.data_manager.get_upcoming_meetings(limit=5)
+        ongoing_meetings = self.data_manager.get_ongoing_meetings()
+
+        if upcoming_meetings or ongoing_meetings:
+            # 显示正在进行的会议
+            if ongoing_meetings:
+                st.markdown("#### 🔄 正在进行的会议")
+                for meeting in ongoing_meetings:
+                    title = meeting.get("meeting_title") or meeting.get(
+                        "title", "未命名会议"
+                    )
+                    start_time = meeting.get("start_datetime") or meeting.get(
+                        "start_time", "未知时间"
+                    )
+                    room_id = meeting.get("room_id", "未知")
+
+                    # 获取房间名称
+                    rooms_df = self.data_manager.get_dataframe("rooms")
+                    room_info = rooms_df[rooms_df["id"] == room_id]
+                    room_name = (
+                        room_info.iloc[0]["name"]
+                        if not room_info.empty
+                        else f"会议室{room_id}"
+                    )
+
+                    st.info(f"**{title}** - {room_name} - {start_time}")
+
+            # 显示即将到来的会议
+            if upcoming_meetings:
+                st.markdown("#### 🕐 即将到来的会议")
+                for meeting in upcoming_meetings:
+                    title = meeting.get("meeting_title") or meeting.get(
+                        "title", "未命名会议"
+                    )
+                    start_time = meeting.get("start_datetime") or meeting.get(
+                        "start_time", "未知时间"
+                    )
+                    room_id = meeting.get("room_id", "未知")
+
+                    # 获取房间名称
+                    rooms_df = self.data_manager.get_dataframe("rooms")
+                    room_info = rooms_df[rooms_df["id"] == room_id]
+                    room_name = (
+                        room_info.iloc[0]["name"]
+                        if not room_info.empty
+                        else f"会议室{room_id}"
+                    )
+
+                    # 计算距离会议开始的时间
+                    start_dt = pd.to_datetime(start_time)
+                    current_time = pd.Timestamp.now()
+                    time_diff = start_dt - current_time
+
+                    if time_diff.total_seconds() > 0:
+                        hours = int(time_diff.total_seconds() // 3600)
+                        minutes = int((time_diff.total_seconds() % 3600) // 60)
+
+                        if hours > 24:
+                            days = hours // 24
+                            remaining_hours = hours % 24
+                            time_until = f"{days}天{remaining_hours}小时"
+                        elif hours > 0:
+                            time_until = f"{hours}小时{minutes}分钟"
+                        else:
+                            time_until = f"{minutes}分钟"
+
+                        st.warning(
+                            f"**{title}** - {room_name} - {start_time} (还有{time_until})"
+                        )
+                    else:
+                        st.warning(
+                            f"**{title}** - {room_name} - {start_time} (即将开始)"
+                        )
+        else:
+            st.info("📝 暂无即将到来的会议")
 
         # Enhanced room usage charts with real data
         st.markdown("---")
