@@ -46,6 +46,20 @@ class BookingPage:
         if "thread_id" not in st.session_state:
             st.session_state.thread_id = str(uuid.uuid4())
 
+        # 初始化用户信息到session state
+        if "user_id" not in st.session_state or "username" not in st.session_state:
+            current_user = self.auth_manager.get_current_user()
+            if current_user:
+                st.session_state.user_id = current_user.get("id", 1)
+                st.session_state.username = current_user.get("name", "用户")
+            else:
+                st.session_state.user_id = 1
+                st.session_state.username = "用户"
+
+        # 初始化工具状态容器
+        if "tool_status_containers" not in st.session_state:
+            st.session_state.tool_status_containers = {}
+
     def get_config(self):
         """获取图配置"""
         return {"configurable": {"thread_id": st.session_state.thread_id}}
@@ -85,212 +99,24 @@ class BookingPage:
         try:
             current_state = graph.get_state(config)
 
-            # 优先检测 action_request（LangGraph中断机制）
-            action_req = current_state.values.get("action_request")
-            if action_req:
-                tool_name = action_req.get("action")
-                tool_args = action_req.get("args", {})
-                confirmation_container = st.container()
-                with confirmation_container:
-                    with st.status(
-                        f"⚠️ 需要确认: {tool_name}",
-                        state="running",
-                        expanded=True,
-                    ):
-                        st.markdown("### 🛠️ 待执行操作")
-                        if tool_name == "book_room":
-                            self.render_booking_confirmation(tool_args)
-                        elif tool_name == "cancel_bookings":
-                            self.render_cancellation_confirmation(tool_args)
-                        elif tool_name == "alter_booking":
-                            self.render_alteration_confirmation(tool_args)
-                        else:
-                            st.json(tool_args)
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button(
-                                "✅ 批准执行",
-                                use_container_width=True,
-                                type="primary",
-                                key="approve_action_actionreq",
-                            ):
-                                self.execute_tool_action(graph, config, "accept")
-                        with col2:
-                            if st.button(
-                                "❌ 拒绝操作",
-                                use_container_width=True,
-                                key="reject_action_actionreq",
-                            ):
-                                self.execute_tool_action(graph, config, "ignore")
-                return  # 已渲染，无需继续
-
-            # 检测 interrupts 字段
-            interrupts = current_state.values.get("interrupts")
-            if interrupts:
-                # 处理中断逻辑
-                for interrupt in interrupts:
-                    if interrupt.get("type") == "tool_call":
-                        tool_name = interrupt.get("tool_name")
-                        tool_args = interrupt.get("tool_args", {})
-                        confirmation_container = st.container()
-                        with confirmation_container:
-                            with st.status(
-                                f"⚠️ 需要确认: {tool_name}",
-                                state="running",
-                                expanded=True,
-                            ):
-                                st.markdown("### 🛠️ 待执行操作")
-                                if tool_name == "book_room":
-                                    self.render_booking_confirmation(tool_args)
-                                elif tool_name == "cancel_bookings":
-                                    self.render_cancellation_confirmation(tool_args)
-                                elif tool_name == "alter_booking":
-                                    self.render_alteration_confirmation(tool_args)
-                                else:
-                                    st.json(tool_args)
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    if st.button(
-                                        "✅ 批准执行",
-                                        use_container_width=True,
-                                        type="primary",
-                                        key="approve_action_interrupt",
-                                    ):
-                                        self.execute_tool_action(
-                                            graph, config, "accept"
-                                        )
-                                with col2:
-                                    if st.button(
-                                        "❌ 拒绝操作",
-                                        use_container_width=True,
-                                        key="reject_action_interrupt",
-                                    ):
-                                        self.execute_tool_action(
-                                            graph, config, "ignore"
-                                        )
-                        return True  # 已渲染，无需继续
-
-            # 检测最新的确认消息
-            messages = current_state.values.get("messages", [])
-            if messages:
-                last_message = messages[-1]
-                if isinstance(last_message, AIMessage) and last_message.content:
-                    # 检查是否包含确认提示的关键词
-                    confirmation_keywords = [
-                        "请确认以上信息是否正确",
-                        "请确认以上信息",
-                        "请确认",
-                        "确认无误",
-                        "我将再次确认",
-                        "请确认您的需求",
-                    ]
-
-                    if any(
-                        keyword in last_message.content
-                        for keyword in confirmation_keywords
-                    ):
-                        # 从消息内容中提取预订信息
-                        booking_info = self.extract_booking_info_from_message(
-                            last_message.content
-                        )
-                        if booking_info:
-                            confirmation_container = st.container()
-                            with confirmation_container:
-                                with st.status(
-                                    "⚠️ 需要确认: 会议室预订",
-                                    state="running",
-                                    expanded=True,
-                                ):
-                                    st.markdown("### 🛠️ 待执行操作")
-                                    self.render_booking_confirmation_from_text(
-                                        booking_info
-                                    )
-                                    col1, col2 = st.columns(2)
-                                    with col1:
-                                        if st.button(
-                                            "✅ 确认预订",
-                                            use_container_width=True,
-                                            type="primary",
-                                            key="approve_booking_text",
-                                        ):
-                                            self.execute_booking_confirmation(
-                                                graph, config, booking_info
-                                            )
-                                    with col2:
-                                        if st.button(
-                                            "❌ 取消预订",
-                                            use_container_width=True,
-                                            key="reject_booking_text",
-                                        ):
-                                            self.execute_booking_cancellation(
-                                                graph, config
-                                            )
-                            return  # 已渲染，无需继续
-
-            # 兼容原有tool_calls逻辑
+            # 检查是否有中断
             if current_state.next and len(current_state.next) > 0:
                 messages = current_state.values.get("messages", [])
                 if messages:
                     last_message = messages[-1]
-                    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+
+                    if isinstance(last_message, AIMessage) and last_message.tool_calls:
                         tool_call = last_message.tool_calls[0]
                         tool_name = tool_call["name"]
                         tool_args = tool_call["args"]
 
-                        confirmation_container = st.container()
-                        with confirmation_container:
-                            with st.status(
-                                f"⚠️ 需要确认: {tool_name}",
-                                state="running",
-                                expanded=True,
-                            ):
-                                st.markdown("### 🛠️ 待执行操作")
-                                if tool_name == "book_room":
-                                    self.render_booking_confirmation(tool_args)
-                                elif tool_name == "cancel_bookings":
-                                    self.render_cancellation_confirmation(tool_args)
-                                elif tool_name == "alter_booking":
-                                    self.render_alteration_confirmation(tool_args)
-                                else:
-                                    st.json(tool_args)
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    if st.button(
-                                        "✅ 批准执行",
-                                        use_container_width=True,
-                                        type="primary",
-                                        key="approve_action_toolcall",
-                                    ):
-                                        self.execute_tool_action(
-                                            graph, config, "accept"
-                                        )
-                                with col2:
-                                    if st.button(
-                                        "❌ 拒绝操作",
-                                        use_container_width=True,
-                                        key="reject_action_toolcall",
-                                    ):
-                                        self.execute_tool_action(
-                                            graph, config, "ignore"
-                                        )
-                        return  # 已渲染，无需继续
-
-                        # 检查最新消息是否有待处理的tool_calls（即使没有next状态）
-            messages = current_state.values.get("messages", [])
-            if messages:
-                last_message = messages[-1]
-                if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-                    tool_call = last_message.tool_calls[0]
-                    tool_name = tool_call["name"]
-                    tool_args = tool_call["args"]
-                    confirmation_container = st.container()
-                    with confirmation_container:
+                        # 创建确认卡片
                         with st.status(
-                            f"⚠️ 需要确认: {tool_name}",
-                            state="running",
-                            expanded=True,
+                            f"⚠️ 需要确认: {tool_name}", state="running", expanded=True
                         ):
                             st.markdown("### 🛠️ 待执行操作")
+
+                            # 根据不同工具显示不同的详情
                             if tool_name == "book_room":
                                 self.render_booking_confirmation(tool_args)
                             elif tool_name == "cancel_bookings":
@@ -299,125 +125,132 @@ class BookingPage:
                                 self.render_alteration_confirmation(tool_args)
                             else:
                                 st.json(tool_args)
+
+                            # 确认按钮
                             col1, col2 = st.columns(2)
+
                             with col1:
                                 if st.button(
                                     "✅ 批准执行",
                                     use_container_width=True,
                                     type="primary",
-                                    key="approve_action_toolcall_no_next",
                                 ):
-                                    self.execute_tool_action(graph, config, "accept")
-                            with col2:
-                                if st.button(
-                                    "❌ 拒绝操作",
-                                    use_container_width=True,
-                                    key="reject_action_toolcall_no_next",
-                                ):
-                                    self.execute_tool_action(graph, config, "ignore")
-                    return True  # 已渲染，无需继续
+                                    # 创建streaming展示容器
+                                    streaming_container = st.empty()
 
-            # 最终检查：遍历所有消息查找待处理的tool_calls
-            messages = current_state.values.get("messages", [])
-            for i, message in enumerate(reversed(messages)):  # 从最新消息开始检查
-                if hasattr(message, "tool_calls") and message.tool_calls:
-                    tool_call = message.tool_calls[0]
-                    tool_name = tool_call["name"]
-                    tool_args = tool_call["args"]
-                    confirmation_container = st.container()
-                    with confirmation_container:
-                        with st.status(
-                            f"⚠️ 需要确认: {tool_name}",
-                            state="running",
-                            expanded=True,
-                        ):
-                            st.markdown("### 🛠️ 待执行操作")
-                            if tool_name == "book_room":
-                                self.render_booking_confirmation(tool_args)
-                            elif tool_name == "cancel_bookings":
-                                self.render_cancellation_confirmation(tool_args)
-                            elif tool_name == "alter_booking":
-                                self.render_alteration_confirmation(tool_args)
-                            else:
-                                st.json(tool_args)
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                if st.button(
-                                    "✅ 批准执行",
-                                    use_container_width=True,
-                                    type="primary",
-                                    key=f"approve_action_toolcall_msg_{i}",
-                                ):
-                                    self.execute_tool_action(graph, config, "accept")
-                            with col2:
-                                if st.button(
-                                    "❌ 拒绝操作",
-                                    use_container_width=True,
-                                    key=f"reject_action_toolcall_msg_{i}",
-                                ):
-                                    self.execute_tool_action(graph, config, "ignore")
-                    return True  # 已渲染，无需继续
+                                    with streaming_container.container():
+                                        st.markdown("### 🔄 执行过程")
+                                        progress_placeholder = st.empty()
+                                        response_placeholder = st.empty()
 
-            return False
+                                        try:
+                                            progress_text = ""
+                                            final_response = ""
+
+                                            # 使用正确的streaming方式 - 修复：resume应该接受列表
+                                            for chunk in graph.stream(
+                                                Command(resume=[{"type": "accept"}]),
+                                                config,
+                                                stream_mode="updates",
+                                            ):
+                                                # chunk的格式是 {node_name: node_data}
+                                                for (
+                                                    node_name,
+                                                    node_data,
+                                                ) in chunk.items():
+                                                    progress_text += f"📍 **{node_name}**: 处理中...\n"
+                                                    progress_placeholder.markdown(
+                                                        progress_text
+                                                    )
+
+                                                    # 如果node_data包含messages，提取AI响应
+                                                    if (
+                                                        isinstance(node_data, dict)
+                                                        and "messages" in node_data
+                                                    ):
+                                                        messages = node_data["messages"]
+                                                        if messages:
+                                                            for message in messages:
+                                                                if (
+                                                                    isinstance(
+                                                                        message,
+                                                                        AIMessage,
+                                                                    )
+                                                                    and message.content
+                                                                ):
+                                                                    final_response = (
+                                                                        message.content
+                                                                    )
+                                                                    response_placeholder.markdown(
+                                                                        f"**🤖 AI响应**:\n{final_response}"
+                                                                    )
+
+                                            st.success("✅ 操作已完成")
+                                            st.rerun()
+
+                                        except Exception as e:
+                                            st.error(f"❌ 执行失败: {e}")
+
+                            with col2:
+                                if st.button("❌ 拒绝操作", use_container_width=True):
+                                    # 创建streaming展示容器
+                                    streaming_container = st.empty()
+
+                                    with streaming_container.container():
+                                        st.markdown("### 🚫 取消过程")
+                                        progress_placeholder = st.empty()
+                                        response_placeholder = st.empty()
+
+                                        try:
+                                            progress_text = ""
+                                            final_response = ""
+
+                                            # 使用正确的streaming方式 - 修复：resume应该接受列表
+                                            for chunk in graph.stream(
+                                                Command(resume=[{"type": "ignore"}]),
+                                                config,
+                                                stream_mode="updates",
+                                            ):
+                                                # chunk的格式是 {node_name: node_data}
+                                                for (
+                                                    node_name,
+                                                    node_data,
+                                                ) in chunk.items():
+                                                    progress_text += f"📍 **{node_name}**: 处理中...\n"
+                                                    progress_placeholder.markdown(
+                                                        progress_text
+                                                    )
+
+                                                    # 如果node_data包含messages，提取AI响应
+                                                    if (
+                                                        isinstance(node_data, dict)
+                                                        and "messages" in node_data
+                                                    ):
+                                                        messages = node_data["messages"]
+                                                        if messages:
+                                                            for message in messages:
+                                                                if (
+                                                                    isinstance(
+                                                                        message,
+                                                                        AIMessage,
+                                                                    )
+                                                                    and message.content
+                                                                ):
+                                                                    final_response = (
+                                                                        message.content
+                                                                    )
+                                                                    response_placeholder.markdown(
+                                                                        f"**🤖 AI响应**:\n{final_response}"
+                                                                    )
+
+                                            st.warning("🚫 操作已取消")
+                                            st.rerun()
+
+                                        except Exception as e:
+                                            st.error(f"❌ 取消失败: {e}")
+
         except Exception as e:
             st.error(f"❌ 检查中断状态失败: {e}")
-            st.write(f"异常详情: {str(e)}")
-            return False
-
-    def execute_tool_action(self, graph, config, action_type):
-        """执行工具操作"""
-        streaming_container = st.empty()
-
-        with streaming_container.container():
-            st.markdown(
-                "### 🔄 执行过程" if action_type == "accept" else "### 🚫 取消过程"
-            )
-            progress_placeholder = st.empty()
-            response_placeholder = st.empty()
-
-            try:
-                final_response = ""
-                processing_nodes = set()  # 跟踪正在处理的节点
-
-                # 使用正确的streaming方式
-                for chunk in graph.stream(
-                    Command(resume=[{"type": action_type}]),
-                    config,
-                    stream_mode="updates",
-                ):
-                    # chunk的格式是 {node_name: node_data}
-                    for node_name, node_data in chunk.items():
-                        # 只在节点开始处理时显示进度，避免重复
-                        if node_name not in processing_nodes:
-                            processing_nodes.add(node_name)
-                            progress_placeholder.markdown(
-                                f"📍 **{node_name}**: 处理中..."
-                            )
-
-                        # 如果node_data包含messages，提取AI响应
-                        if isinstance(node_data, dict) and "messages" in node_data:
-                            messages = node_data["messages"]
-                            if messages:
-                                for message in messages:
-                                    if (
-                                        isinstance(message, AIMessage)
-                                        and message.content
-                                    ):
-                                        final_response = message.content
-                                        # 清除进度显示，显示最终响应
-                                        progress_placeholder.empty()
-                                        response_placeholder.markdown(
-                                            f"**🤖 AI响应**:\n{final_response}"
-                                        )
-
-                if action_type == "accept":
-                    st.success("✅ 操作已完成")
-                else:
-                    st.warning("🚫 操作已取消")
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"❌ 执行失败: {e}")
 
     def render_booking_confirmation(self, tool_args):
         """渲染预订确认详情"""
@@ -479,187 +312,95 @@ class BookingPage:
                 elif key == "new_end_time":
                     st.markdown(f"- **新结束时间**: {value}")
 
-    def extract_booking_info_from_message(self, message_content):
-        """从确认消息中提取预订信息"""
-        import re
+    def process_stream_events(self, events):
+        """处理流式事件"""
+        ai_placeholder = st.empty()
+        full_response = ""
 
-        booking_info = {}
+        for chunk in events:
+            # LangGraph流式 输出格式是 {node_name: node_data}
+            for node_name, node_data in chunk.items():
+                if isinstance(node_data, dict) and "messages" in node_data:
+                    messages = node_data["messages"]
+                    for message in messages:
+                        if isinstance(message, AIMessage):
+                            if message.tool_calls:
+                                # 为工具调用创建状态容器
+                                for tool_call in message.tool_calls:
+                                    tool_call_id = tool_call["id"]
+                                    tool_name = tool_call["name"]
 
-        # 提取会议室名称
-        room_match = re.search(r"会议室[：:]\s*([^\n]+)", message_content)
-        if room_match:
-            booking_info["room_name"] = room_match.group(1).strip()
+                                    if (
+                                        tool_call_id
+                                        not in st.session_state.tool_status_containers
+                                    ):
+                                        status_container = st.status(
+                                            f"🔧 执行工具: {tool_name}",
+                                            state="running",
+                                            expanded=True,
+                                        )
+                                        st.session_state.tool_status_containers[
+                                            tool_call_id
+                                        ] = status_container
 
-        # 提取时间段
-        time_match = re.search(r"时间段[：:]\s*([^\n]+)", message_content)
-        if time_match:
-            booking_info["time_range"] = time_match.group(1).strip()
+                                        with status_container:
+                                            st.json(tool_call["args"])
+                            else:
+                                # 累积AI回复文本
+                                full_response += message.content
+                                ai_placeholder.markdown(full_response + "▌")
 
-        # 提取会议主题
-        title_match = re.search(r"会议主题[：:]\s*([^\n]+)", message_content)
-        if title_match:
-            booking_info["title"] = title_match.group(1).strip()
+                        elif isinstance(message, ToolMessage):
+                            tool_call_id = message.tool_call_id
+                            if tool_call_id in st.session_state.tool_status_containers:
+                                status_container = (
+                                    st.session_state.tool_status_containers[
+                                        tool_call_id
+                                    ]
+                                )
+                                status_container.update(state="complete")
 
-        # 如果没有找到标准格式，尝试其他模式
-        if not booking_info.get("room_name"):
-            # 尝试匹配 "C102会议室" 这样的格式
-            room_match = re.search(r"([A-Z]\d+会议室)", message_content)
-            if room_match:
-                booking_info["room_name"] = room_match.group(1)
+                                with status_container:
+                                    st.success("✅ 工具执行完成")
+                                    if message.content:
+                                        st.text(message.content)
 
-        if not booking_info.get("time_range"):
-            # 尝试匹配日期时间格式
-            time_match = re.search(
-                r"(\d{4}年\d{2}月\d{2}日\s+\d{2}:\d{2}\s*-\s*\d{2}:\d{2})",
-                message_content,
-            )
-            if time_match:
-                booking_info["time_range"] = time_match.group(1)
+        # 显示最终回复
+        if full_response:
+            ai_placeholder.markdown(full_response)
 
-        if not booking_info.get("title"):
-            # 尝试匹配会议主题
-            title_match = re.search(r"主题[：:]\s*([^\n]+)", message_content)
-            if title_match:
-                booking_info["title"] = title_match.group(1).strip()
-
-        return booking_info if booking_info else None
-
-    def render_booking_confirmation_from_text(self, booking_info):
-        """从文本信息渲染预订确认详情"""
-        st.markdown("**📅 会议室预订**")
-
-        if booking_info.get("room_name"):
-            st.markdown(f"🏢 **会议室**: {booking_info['room_name']}")
-
-        if booking_info.get("time_range"):
-            st.markdown(f"⏰ **时间段**: {booking_info['time_range']}")
-
-        if booking_info.get("title"):
-            st.markdown(f"📝 **会议主题**: {booking_info['title']}")
-
-    def execute_booking_confirmation(self, graph, config, booking_info):
-        """执行预订确认"""
-        # 根据提取的信息构造预订参数
-        room_name = booking_info.get("room_name", "")
-
-        # 从房间名称获取房间ID
-        rooms_df = self.data_manager.get_dataframe("rooms")
-        room = rooms_df[rooms_df["name"] == room_name]
-
-        if room.empty:
-            st.error(f"❌ 未找到会议室: {room_name}")
-            return
-
-        room_id = room.iloc[0]["id"]
-
-        # 解析时间范围
-        time_range = booking_info.get("time_range", "")
-        start_time, end_time = self.parse_time_range(time_range)
-
-        # 构造预订参数
-        booking_args = {
-            "room_id": room_id,
-            "user_id": 1,  # 默认用户ID
-            "start_time": start_time,
-            "end_time": end_time,
-            "title": booking_info.get("title", "会议"),
-        }
-
-        # 执行预订
-        try:
-            # 直接调用数据管理器进行预订
-            result = self.data_manager.book_room(**booking_args)
-            if result:
-                st.success("✅ 预订成功！")
-                st.rerun()
-            else:
-                st.error("❌ 预订失败")
-        except Exception as e:
-            st.error(f"❌ 预订失败: {e}")
-
-    def execute_booking_cancellation(self, graph, config):
-        """执行预订取消"""
-        st.info("🚫 预订已取消")
-        st.rerun()
-
-    def parse_time_range(self, time_range):
-        """解析时间范围字符串"""
-        import re
-        from datetime import datetime
-
-        # 匹配 "2025年07月17日 11:00 - 12:00" 格式
-        pattern = r"(\d{4})年(\d{2})月(\d{2})日\s+(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})"
-        match = re.search(pattern, time_range)
-
-        if match:
-            year, month, day, start_hour, start_min, end_hour, end_min = match.groups()
-            start_time = f"{year}-{month}-{day} {start_hour}:{start_min}:00"
-            end_time = f"{year}-{month}-{day} {end_hour}:{end_min}:00"
-            return start_time, end_time
-
-        # 如果解析失败，返回默认值
-        return "2025-07-17 11:00:00", "2025-07-17 12:00:00"
+        # 清空工具状态容器
+        st.session_state.tool_status_containers = {}
 
     def handle_user_input(self):
         """处理用户输入"""
-        if prompt := st.chat_input("请输入您的需求..."):
-            # 添加用户消息到聊天
+        if user_input := st.chat_input("请输入您的需求..."):
+            # 立即显示用户消息
             with st.chat_message("human"):
-                st.markdown(prompt)
+                st.markdown(user_input)
 
-            # 获取图实例和配置
-            graph = st.session_state.graph
-            config = self.get_config()
-
-            # 设置用户信息
-            current_user = self.auth_manager.get_current_user()
-            user_id = current_user.get("id", 1) if current_user else 1
-            username = current_user.get("name", "用户") if current_user else "用户"
-
-            # 创建streaming展示容器
+            # 处理AI回复
             with st.chat_message("assistant"):
-                message_placeholder = st.empty()
-                progress_placeholder = st.empty()
+                graph = st.session_state.graph
+                config = self.get_config()
 
                 try:
-                    final_response = ""
-                    processing_nodes = set()  # 跟踪正在处理的节点
+                    with st.spinner("🤔 AI正在思考..."):
+                        # 构建输入状态，包含用户信息
+                        input_state = {
+                            "messages": [HumanMessage(content=user_input)],
+                            "current_user_id": st.session_state.user_id,
+                            "current_username": st.session_state.username,
+                        }
 
-                    # 使用streaming方式处理用户输入
-                    for chunk in graph.stream(
-                        {"messages": [HumanMessage(content=prompt)]},
-                        config,
-                        stream_mode="updates",
-                    ):
-                        # chunk的格式是 {node_name: node_data}
-                        for node_name, node_data in chunk.items():
-                            # 只在节点开始处理时显示进度，避免重复
-                            if node_name not in processing_nodes:
-                                processing_nodes.add(node_name)
-                                progress_placeholder.markdown(
-                                    f"📍 **{node_name}**: 处理中..."
-                                )
+                        # 使用流式调用
+                        events = graph.stream(
+                            input_state, config, stream_mode="updates"
+                        )
+                        self.process_stream_events(events)
 
-                            # 如果node_data包含messages，提取AI响应
-                            if isinstance(node_data, dict) and "messages" in node_data:
-                                messages = node_data["messages"]
-                                if messages:
-                                    for message in messages:
-                                        if (
-                                            isinstance(message, AIMessage)
-                                            and message.content
-                                        ):
-                                            final_response = message.content
-                                            # 清除进度显示，显示最终响应
-                                            progress_placeholder.empty()
-                                            message_placeholder.markdown(final_response)
-
-                    # 最终显示
-                    if final_response:
-                        message_placeholder.markdown(final_response)
-                    else:
-                        # 如果没有最终响应，清除进度显示
-                        progress_placeholder.empty()
+                    # 刷新页面以显示可能的新中断
+                    st.rerun()
 
                 except Exception as e:
                     st.error(f"❌ 处理失败: {e}")
@@ -675,7 +416,7 @@ class BookingPage:
         self.initialize_graph()
 
         # 渲染人工介入确认 - 优先检查并显示
-        confirmation_shown = self.render_hitl_confirmation()
+        self.render_hitl_confirmation()
 
         # 渲染历史消息
         self.render_message_history()

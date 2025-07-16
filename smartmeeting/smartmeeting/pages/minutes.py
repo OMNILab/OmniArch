@@ -6,6 +6,7 @@ Contains the minutes page implementation for the smart meeting system
 import streamlit as st
 import pandas as pd
 import os
+from datetime import datetime
 from smartmeeting.tools import (
     generate_minutes_from_text,
     transcribe_file,
@@ -20,6 +21,36 @@ class MinutesPage:
         self.data_manager = data_manager
         self.auth_manager = auth_manager
         self.ui = ui_components
+
+    def _find_existing_minutes(self, meeting_id):
+        """Find existing minutes for a meeting"""
+        minutes_df = self.data_manager.get_dataframe("minutes")
+        if "meeting_id" in minutes_df.columns:
+            existing_minutes = minutes_df[minutes_df["meeting_id"] == meeting_id]
+        elif "booking_id" in minutes_df.columns:
+            existing_minutes = minutes_df[minutes_df["booking_id"] == meeting_id]
+        else:
+            existing_minutes = pd.DataFrame()
+
+        return existing_minutes.iloc[0] if len(existing_minutes) > 0 else None
+
+    def _update_existing_minutes(self, meeting_id, new_minutes_data):
+        """Update existing minutes for a meeting"""
+        minutes_data = self.data_manager.get_data()
+        minutes_list = minutes_data["minutes"]
+
+        for i, minute in enumerate(minutes_list):
+            if (
+                minute.get("meeting_id") == meeting_id
+                or minute.get("booking_id") == meeting_id
+            ):
+                # Update the existing minutes
+                minutes_list[i].update(new_minutes_data)
+                minutes_list[i]["updated_datetime"] = datetime.now()
+                minutes_list[i]["updated_at"] = minutes_list[i]["updated_datetime"]
+                return True
+
+        return False
 
     def _get_status_color(self, status):
         """Get color for different status types"""
@@ -77,10 +108,32 @@ class MinutesPage:
         if meeting_mode == "选择已有会议":
             # Select existing meeting for minutes
             meetings_df = self.data_manager.get_dataframe("meetings")
-            meeting_options = [
-                f"{row['title']} - {row['start_time']}"
-                for _, row in meetings_df.iterrows()
-            ]
+
+            # Fix column name mapping - use correct column names from CSV
+            title_col = (
+                "meeting_title" if "meeting_title" in meetings_df.columns else "title"
+            )
+            time_col = (
+                "start_datetime"
+                if "start_datetime" in meetings_df.columns
+                else "start_time"
+            )
+
+            meeting_options = []
+            for _, row in meetings_df.iterrows():
+                title = row.get(title_col, "未命名会议")
+                start_time = row.get(time_col, "未知时间")
+
+                # Format datetime if it's a datetime object
+                if pd.notna(start_time):
+                    if hasattr(start_time, "strftime"):
+                        start_time = start_time.strftime("%Y-%m-%d %H:%M")
+                    else:
+                        start_time = str(start_time)
+                else:
+                    start_time = "未知时间"
+
+                meeting_options.append(f"{title} - {start_time}")
 
             if len(meeting_options) > 0:
                 selected_meeting_option = st.selectbox("选择会议", meeting_options)
@@ -89,7 +142,7 @@ class MinutesPage:
                 ]["id"]
                 selected_meeting_title = meetings_df.iloc[
                     meeting_options.index(selected_meeting_option)
-                ]["title"]
+                ][title_col]
             else:
                 st.warning("暂无会议记录")
                 selected_meeting_id = None
@@ -176,11 +229,33 @@ class MinutesPage:
                             )
 
                             if generated_minute:
-                                # Add to data manager
-                                self.data_manager.add_minute(generated_minute)
+                                # Check if we're updating an existing meeting
+                                if (
+                                    meeting_mode == "选择已有会议"
+                                    and selected_meeting_id
+                                ):
+                                    # Try to update existing minutes
+                                    if self._update_existing_minutes(
+                                        selected_meeting_id, generated_minute
+                                    ):
+                                        st.success("会议纪要已更新！")
+                                    else:
+                                        # If no existing minutes found, add new one with meeting_id
+                                        generated_minute["meeting_id"] = (
+                                            selected_meeting_id
+                                        )
+                                        generated_minute["booking_id"] = (
+                                            selected_meeting_id
+                                        )
+                                        self.data_manager.add_minute(generated_minute)
+                                        st.success("会议纪要生成完成并已保存！")
+                                else:
+                                    # Add new minutes
+                                    self.data_manager.add_minute(generated_minute)
+                                    st.success("会议纪要生成完成并已保存！")
+
                                 # 立即刷新 minutes_df，以便展示时不依赖过期状态
                                 minutes_df = self.data_manager.get_dataframe("minutes")
-                                st.success("会议纪要生成完成并已保存！")
                                 st.rerun()
                             else:
                                 st.error("生成会议纪要失败，请重试")
@@ -232,15 +307,22 @@ class MinutesPage:
                     unsafe_allow_html=True,
                 )
 
-                # Audio player container
+                # # Audio player container - use Streamlit's native audio component
+                # st.markdown(
+                #     f"""
+                # <div class="audio-player">
+                #     <h4 style="color: white; margin-bottom: 15px;">🎧 {selected_audio}</h4>
+                # </div>
+                # """,
+                #     unsafe_allow_html=True,
+                # )
+
+                # Use Streamlit's native audio component for better compatibility
+                st.audio(audio_url, format="video/mp4")
+
                 st.markdown(
-                    f"""
+                    """
                 <div class="audio-player">
-                    <h4 style="color: white; margin-bottom: 15px;">🎧 {selected_audio}</h4>
-                    <audio controls preload="metadata">
-                        <source src="{audio_url}" type="video/mp4">
-                        您的浏览器不支持音频播放。
-                    </audio>
                     <p style="color: white; margin-top: 10px; font-size: 12px;">
                         💡 提示：您可以先预览音频内容，确认无误后再进行转写
                     </p>
@@ -314,17 +396,44 @@ class MinutesPage:
                                         st.write("生成的纪要数据:", generated_minute)
 
                                         if generated_minute:
-                                            # Add to data manager
-                                            self.data_manager.add_minute(
-                                                generated_minute
-                                            )
+                                            # Check if we're updating an existing meeting
+                                            if (
+                                                meeting_mode == "选择已有会议"
+                                                and selected_meeting_id
+                                            ):
+                                                # Try to update existing minutes
+                                                if self._update_existing_minutes(
+                                                    selected_meeting_id,
+                                                    generated_minute,
+                                                ):
+                                                    st.success("会议纪要已更新！")
+                                                else:
+                                                    # If no existing minutes found, add new one with meeting_id
+                                                    generated_minute["meeting_id"] = (
+                                                        selected_meeting_id
+                                                    )
+                                                    generated_minute["booking_id"] = (
+                                                        selected_meeting_id
+                                                    )
+                                                    self.data_manager.add_minute(
+                                                        generated_minute
+                                                    )
+                                                    st.success(
+                                                        "会议纪要生成完成并已保存！"
+                                                    )
+                                            else:
+                                                # Add new minutes
+                                                self.data_manager.add_minute(
+                                                    generated_minute
+                                                )
+                                                st.success("会议纪要生成完成并已保存！")
+
                                             # 立即刷新 minutes_df，以便展示时不依赖过期状态
                                             minutes_df = (
                                                 self.data_manager.get_dataframe(
                                                     "minutes"
                                                 )
                                             )
-                                            st.success("会议纪要生成完成并已保存！")
                                             st.rerun()
                                         else:
                                             st.error("生成会议纪要失败，请重试")
