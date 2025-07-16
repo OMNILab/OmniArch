@@ -13,6 +13,11 @@ from smartmeeting.tools import (
     extract_transcription_text,
     extract_list_from_text,
 )
+from smartmeeting.tools.task_generator import (
+    generate_tasks_from_action_items,
+    extract_action_items_from_minutes,
+    extract_attendees_from_minutes,
+)
 
 
 class MinutesPage:
@@ -662,6 +667,48 @@ class MinutesPage:
                                     self.data_manager.update_minute_status(
                                         actual_id, "已发布"
                                     )
+                                    # 自动生成任务并同步到任务看板
+                                    action_items = extract_action_items_from_minutes(
+                                        minute
+                                    )
+                                    attendees = extract_attendees_from_minutes(minute)
+                                    meeting_title = (
+                                        minute.get("meeting_title")
+                                        or minute.get("title")
+                                        or ""
+                                    )
+                                    meeting_id = (
+                                        minute.get("booking_id")
+                                        or minute.get("meeting_id")
+                                        or actual_id
+                                    )
+
+                                    # 获取会议数据以获取组织者信息
+                                    meeting_data = None
+                                    if meeting_id:
+                                        meeting_data = (
+                                            self.data_manager.get_meeting_by_id(
+                                                meeting_id
+                                            )
+                                        )
+
+                                    # 获取用户数据用于任务校验
+                                    users_df = self.data_manager.get_dataframe("users")
+
+                                    tasks = generate_tasks_from_action_items(
+                                        action_items,
+                                        meeting_title,
+                                        meeting_id,
+                                        attendees,
+                                        meeting_data,
+                                        users_df,
+                                    )
+                                    for task in tasks:
+                                        self.data_manager.add_task(task)
+                                    if tasks:
+                                        st.success(
+                                            f"已自动生成{len(tasks)}条任务并同步到任务看板！"
+                                        )
                                     st.success("纪要已发布")
                                     st.rerun()
                                 else:
