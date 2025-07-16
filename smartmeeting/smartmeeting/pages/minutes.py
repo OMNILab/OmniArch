@@ -30,7 +30,6 @@ class MinutesPage:
             existing_minutes = minutes_df[minutes_df["booking_id"] == booking_id]
         else:
             existing_minutes = pd.DataFrame()
-
         return existing_minutes.iloc[0] if len(existing_minutes) > 0 else None
 
     def _update_existing_minutes(self, booking_id, new_minutes_data):
@@ -103,41 +102,30 @@ class MinutesPage:
         if meeting_mode == "选择已有会议":
             # Select existing meeting for minutes
             meetings_df = self.data_manager.get_dataframe("meetings")
-
-            # Use correct column names from CSV
-            title_col = (
-                "meeting_title" if "meeting_title" in meetings_df.columns else "title"
-            )
-            time_col = (
-                "start_datetime"
-                if "start_datetime" in meetings_df.columns
-                else "start_time"
-            )
-
             meeting_options = []
             meeting_status_info = []  # 存储会议状态信息
 
             # 按开始时间逆序排序
-            if time_col in meetings_df.columns:
+            if "start_datetime" in meetings_df.columns:
                 # 确保时间列是datetime类型，避免混合类型比较错误
                 try:
                     meetings_df_copy = meetings_df.copy()
-                    meetings_df_copy[time_col] = pd.to_datetime(
-                        meetings_df_copy[time_col], errors="coerce"
+                    meetings_df_copy["start_datetime"] = pd.to_datetime(
+                        meetings_df_copy["start_datetime"], errors="coerce"
                     )
                     meetings_df_sorted = meetings_df_copy.sort_values(
-                        time_col, ascending=False
+                        "start_datetime", ascending=False
                     )
                 except Exception as e:
                     # 如果转换失败，使用原始数据不排序
-                    print(f"Warning: Could not sort by {time_col}: {e}")
+                    print(f"Warning: Could not sort by start_datetime: {e}")
                     meetings_df_sorted = meetings_df
             else:
                 meetings_df_sorted = meetings_df
 
             for _, row in meetings_df_sorted.iterrows():
-                title = row.get(title_col, "未命名会议")
-                start_time = row.get(time_col, "未知时间")
+                title = row.get("meeting_title", "未命名会议")
+                start_time = row.get("start_datetime", "未知时间")
                 meeting_status = row.get("meeting_status", "upcoming")
 
                 # Format datetime if it's a datetime object
@@ -173,7 +161,7 @@ class MinutesPage:
                     "booking_id"
                 ]
                 selected_meeting_title = meetings_df_sorted.iloc[selected_index][
-                    title_col
+                    "meeting_title"
                 ]
                 selected_meeting_status = meeting_status_info[selected_index]
 
@@ -241,15 +229,8 @@ class MinutesPage:
                 if st.button("生成纪要", type="primary", key="generate_from_text"):
                     with st.spinner("正在生成会议纪要..."):
                         try:
-                            # Read the uploaded text file
-                            if uploaded_text.name.endswith(".txt"):
-                                content = uploaded_text.read().decode("utf-8")
-                            else:
-                                # For other file types, we'll need to implement proper parsing
-                                st.error("目前仅支持txt文件格式")
-                                return
-
-                            # Fallback: if selected_meeting_title is empty, use first 8 chars of content
+                            content = uploaded_text.read().decode("utf-8")
+                            # if selected_meeting_title is empty, use first 8 chars of content
                             meeting_title_to_use = selected_meeting_title
                             if (
                                 not meeting_title_to_use
@@ -344,16 +325,6 @@ class MinutesPage:
                     unsafe_allow_html=True,
                 )
 
-                # # Audio player container - use Streamlit's native audio component
-                # st.markdown(
-                #     f"""
-                # <div class="audio-player">
-                #     <h4 style="color: white; margin-bottom: 15px;">🎧 {selected_audio}</h4>
-                # </div>
-                # """,
-                #     unsafe_allow_html=True,
-                # )
-
                 # Use Streamlit's native audio component for better compatibility
                 st.audio(audio_url, format="video/mp4")
 
@@ -368,124 +339,101 @@ class MinutesPage:
                     unsafe_allow_html=True,
                 )
 
-                # Check if environment variables are set
-                ak_id = os.getenv("ALIYUN_AK_ID")
-                ak_secret = os.getenv("ALIYUN_AK_SECRET")
-                app_key = os.getenv("NLS_APP_KEY")
+                if st.button("生成会议纪要", type="primary", key="start_transcription"):
+                    with st.spinner("正在转写音频文件..."):
+                        try:
+                            file_link = audio_files[selected_audio]
 
-                if not all([ak_id, ak_secret, app_key]):
-                    st.error(
-                        "缺少必要的环境变量配置。请设置 ALIYUN_AK_ID、ALIYUN_AK_SECRET 和 NLS_APP_KEY"
-                    )
-                else:
-                    if st.button(
-                        "生成会议纪要", type="primary", key="start_transcription"
-                    ):
-                        with st.spinner("正在转写音频文件..."):
-                            try:
-                                file_link = audio_files[selected_audio]
+                            # Call the transcription function
+                            result = transcribe_file(
+                                os.getenv("ALIYUN_AK_ID"),
+                                os.getenv("ALIYUN_AK_SECRET"),
+                                os.getenv("NLS_APP_KEY"),
+                                file_link,
+                            )
 
-                                # Call the transcription function
-                                result = transcribe_file(
-                                    ak_id, ak_secret, app_key, file_link
-                                )
+                            if result:
+                                # Extract the transcription text from the result
+                                transcription_text = extract_transcription_text(result)
 
-                                if result:
-                                    # Extract the transcription text from the result
-                                    transcription_text = extract_transcription_text(
-                                        result
-                                    )
+                                if transcription_text:
+                                    st.success("音频转写完成！")
 
-                                    if transcription_text:
-                                        st.success("音频转写完成！")
-
-                                        # Show transcription preview
-                                        with st.expander("查看转写结果"):
-                                            st.text_area(
-                                                "转写文本",
-                                                transcription_text,
-                                                height=200,
-                                            )
-
-                                        # Fallback: if selected_meeting_title is empty, use first 8 chars of transcription_text
-                                        meeting_title_to_use = selected_meeting_title
-                                        if (
-                                            not meeting_title_to_use
-                                            or not meeting_title_to_use.strip()
-                                        ):
-                                            meeting_title_to_use = (
-                                                transcription_text[:8].strip()
-                                                or "未命名纪要"
-                                            )
-
-                                        # Generate minutes from transcription
-                                        generated_minute = generate_minutes_from_text(
+                                    # Show transcription preview
+                                    with st.expander("查看转写结果"):
+                                        st.text_area(
+                                            "转写文本",
                                             transcription_text,
-                                            meeting_title_to_use,
-                                            (
-                                                new_meeting_datetime
-                                                if "new_meeting_datetime" in locals()
-                                                else None
-                                            ),
+                                            height=200,
                                         )
 
-                                        # Debug: Show generated minute result
-                                        st.write("生成的纪要数据:", generated_minute)
+                                    # Fallback: if selected_meeting_title is empty, use first 8 chars of transcription_text
+                                    meeting_title_to_use = selected_meeting_title
+                                    if (
+                                        not meeting_title_to_use
+                                        or not meeting_title_to_use.strip()
+                                    ):
+                                        meeting_title_to_use = (
+                                            transcription_text[:8].strip()
+                                            or "未命名纪要"
+                                        )
 
-                                        if generated_minute:
-                                            # Check if we're updating an existing meeting
-                                            if (
-                                                meeting_mode == "选择已有会议"
-                                                and selected_meeting_id
+                                    # Generate minutes from transcription
+                                    generated_minute = generate_minutes_from_text(
+                                        transcription_text,
+                                        meeting_title_to_use,
+                                        (
+                                            new_meeting_datetime
+                                            if "new_meeting_datetime" in locals()
+                                            else None
+                                        ),
+                                    )
+
+                                    # Debug: Show generated minute result
+                                    st.write("生成的纪要数据:", generated_minute)
+
+                                    if generated_minute:
+                                        # Check if we're updating an existing meeting
+                                        if (
+                                            meeting_mode == "选择已有会议"
+                                            and selected_meeting_id
+                                        ):
+                                            # Try to update existing minutes
+                                            if self._update_existing_minutes(
+                                                selected_meeting_id,
+                                                generated_minute,
                                             ):
-                                                # Try to update existing minutes
-                                                if self._update_existing_minutes(
-                                                    selected_meeting_id,
-                                                    generated_minute,
-                                                ):
-                                                    st.success("会议纪要已更新！")
-                                                else:
-                                                    # If no existing minutes found, add new one with booking_id
-                                                    generated_minute["booking_id"] = (
-                                                        selected_meeting_id
-                                                    )
-                                                    self.data_manager.add_minute(
-                                                        generated_minute
-                                                    )
-                                                    st.success(
-                                                        "会议纪要生成完成并已保存！"
-                                                    )
+                                                st.success("会议纪要已更新！")
                                             else:
-                                                # Add new minutes
+                                                # If no existing minutes found, add new one with booking_id
+                                                generated_minute["booking_id"] = (
+                                                    selected_meeting_id
+                                                )
                                                 self.data_manager.add_minute(
                                                     generated_minute
                                                 )
                                                 st.success("会议纪要生成完成并已保存！")
-
-                                            # 立即刷新 minutes_df，以便展示时不依赖过期状态
-                                            minutes_df = (
-                                                self.data_manager.get_dataframe(
-                                                    "minutes"
-                                                )
-                                            )
-                                            st.rerun()
                                         else:
-                                            st.error("生成会议纪要失败，请重试")
+                                            # Add new minutes
+                                            self.data_manager.add_minute(
+                                                generated_minute
+                                            )
+                                            st.success("会议纪要生成完成并已保存！")
+
+                                        # 立即刷新 minutes_df，以便展示时不依赖过期状态
+                                        minutes_df = self.data_manager.get_dataframe(
+                                            "minutes"
+                                        )
+                                        st.rerun()
                                     else:
-                                        st.error("转写结果为空，请重试")
+                                        st.error("生成会议纪要失败，请重试")
                                 else:
-                                    st.error("音频转写失败，请重试")
+                                    st.error("转写结果为空，请重试")
+                            else:
+                                st.error("音频转写失败，请重试")
 
-                            except Exception as e:
-                                st.error(f"转写过程中出错: {str(e)}")
-
-        # Show current meeting info
-        # if selected_meeting_title:
-        #     st.info(f"当前会议: {selected_meeting_title}")
-        # elif meeting_mode == "创建新会议" and new_meeting_title:
-        #     st.info(f"新会议: {new_meeting_title}")
-        # else:
-        #     st.warning("请选择会议或输入会议标题")
+                        except Exception as e:
+                            st.error(f"转写过程中出错: {str(e)}")
 
         # Minutes list with enhanced features
         st.markdown("---")
@@ -593,17 +541,9 @@ class MinutesPage:
             if len(filtered_df) > 0:
                 for idx in range(start_idx, end_idx):
                     minute = filtered_df.iloc[idx]
-
-                    # Title fallback and sanitization
-                    raw_title = (
-                        minute.get("title")
-                        or minute.get("meeting_title")
-                        or f"未命名纪要 {idx + 1}"
-                    )
+                    raw_title = minute.get("meeting_title")
                     title = (
-                        str(raw_title).strip()
-                        if pd.notna(raw_title)
-                        else f"未命名纪要 {idx + 1}"
+                        str(raw_title).strip() if pd.notna(raw_title) else "未命名纪要"
                     )
 
                     # Status fallback
