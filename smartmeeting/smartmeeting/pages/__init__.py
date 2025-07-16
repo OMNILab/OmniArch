@@ -10,7 +10,8 @@ from .minutes import MinutesPage
 from .tasks import TasksPage
 from .dashboard import DashboardPage
 from .settings import SettingsPage
-from .analysis import AnalysisPage
+
+# from .analysis import AnalysisPage
 
 __all__ = [
     "LoginPage",
@@ -20,5 +21,5 @@ __all__ = [
     "TasksPage",
     "DashboardPage",
     "SettingsPage",
-    "AnalysisPage",
+    # "AnalysisPage",
 ]

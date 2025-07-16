@@ -12,7 +12,7 @@ from .pages import (
     TasksPage,
     DashboardPage,
     SettingsPage,
-    AnalysisPage,
+    # AnalysisPage,
 )
 
 
@@ -33,7 +33,7 @@ class Pages:
         self.tasks_page = TasksPage(data_manager, auth_manager, ui_components)
         self.dashboard_page = DashboardPage(data_manager, auth_manager, ui_components)
         self.settings_page = SettingsPage(data_manager, auth_manager, ui_components)
-        self.analysis_page = AnalysisPage(data_manager, auth_manager, ui_components)
+        # self.analysis_page = AnalysisPage(data_manager, auth_manager, ui_components)
 
     def _init_page_state(self):
         """Initialize page-specific session state"""
@@ -76,6 +76,6 @@ class Pages:
         """Show the settings page"""
         return self.settings_page.show()
 
-    def show_analysis_page(self):
-        """Show the PandasAI demo page"""
-        return self.analysis_page.show()
+    # def show_analysis_page(self):
+    #     """Show the PandasAI demo page"""
+    #     return self.analysis_page.show()

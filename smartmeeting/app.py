@@ -164,8 +164,8 @@ def main():
         if st.button("📊 会议统计", use_container_width=True):
             st.session_state.current_page = "会议统计"
 
-        if st.button("🤖 智能分析", use_container_width=True):
-            st.session_state.current_page = "智能分析"
+        # if st.button("🤖 智能分析", use_container_width=True):
+        #     st.session_state.current_page = "智能分析"
 
         if st.button("⚙️ 系统设置", use_container_width=True):
             st.session_state.current_page = "系统设置"
@@ -183,8 +183,8 @@ def main():
         pages.show_tasks_page()
     elif page == "会议统计":
         pages.show_dashboard_page()
-    elif page == "智能分析":
-        pages.show_analysis_page()
+    # elif page == "智能分析":
+    #     pages.show_analysis_page()
     elif page == "系统设置":
         pages.show_settings_page()
 

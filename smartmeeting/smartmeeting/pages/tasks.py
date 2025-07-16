@@ -94,6 +94,11 @@ class TasksPage:
                 filtered_tasks["department"] == selected_dept
             ]
 
+        # Show meeting status information
+        st.markdown("---")
+        st.markdown("### 📅 即将到来的会议")
+        self.ui.show_meeting_status(self.data_manager, limit=3)
+
         # Show statistics
         self._show_task_statistics(filtered_tasks)
 
@@ -392,9 +397,14 @@ class TasksPage:
             """
         **📊 任务管理**:
         - 查看所有任务进展
-        - 按会议、部门筛选
+        - 按部门筛选
         - 甘特图时间线显示
         - 任务状态统计
+        
+        **📅 会议状态**:
+        - 实时显示正在进行的会议
+        - 即将到来的会议提醒
+        - 会议时间倒计时
         
         **🎯 任务状态**:
         - 草稿：待确认
