@@ -8,6 +8,7 @@ import streamlit as st
 import json
 import re
 from datetime import datetime
+from .text_utils import extract_list_from_text, normalize_text_separators
 
 
 def generate_minutes_from_text(text, meeting_title, meeting_datetime=None):
@@ -70,8 +71,8 @@ def generate_minutes_from_text(text, meeting_title, meeting_datetime=None):
                 f"请以JSON格式返回以下信息：\n"
                 f"{{\n"
                 f'  "summary": "会议主要内容摘要（100字以内）",\n'
-                f'  "key_decisions": "重要决策事项（用分号分隔，如无决策可写\'无\'）",\n'
-                f'  "action_items": "需要执行的任务或行动项（用分号分隔，如无行动项可写\'无\'）",\n'
+                f'  "key_decisions": "重要决策事项（用分号或句号分隔，如无决策可写\'无\'）",\n'
+                f'  "action_items": "需要执行的任务或行动项（用分号或句号分隔，如无行动项可写\'无\'）",\n'
                 f'  "attendees": "与会人员名单（用分号分隔，从文本中提取人名）",\n'
                 f'  "meeting_title": "会议标题（从文本中提取或推断）",\n'
                 f'  "duration_minutes": 60\n'
@@ -79,7 +80,8 @@ def generate_minutes_from_text(text, meeting_title, meeting_datetime=None):
                 f"注意：\n"
                 f"1. 只返回JSON格式，不要其他内容\n"
                 f"2. 如果某项信息无法从文本中提取，使用合理的默认值\n"
-                f"3. 确保JSON格式正确，可以被解析"
+                f"3. 确保JSON格式正确，可以被解析\n"
+                f"4. 决策事项和行动项可以使用中文或英文的分号(;；)或句号(.。)分隔"
             )
 
             # Call LLM with timeout and error handling
@@ -140,8 +142,6 @@ def generate_minutes_from_text(text, meeting_title, meeting_datetime=None):
 
     if not default_minute["attendees"]:
         # Extract potential attendees from text
-        import re
-
         # Look for patterns like "我叫XXX" or "我是XXX"
         name_patterns = [
             r"我叫([^，。\s]+)",
@@ -167,7 +167,10 @@ def generate_minutes_from_text(text, meeting_title, meeting_datetime=None):
                 decision_sentences.append(sentence.strip())
 
         if decision_sentences:
-            default_minute["key_decisions"] = ";".join(decision_sentences[:3])
+            # Use the text utility to normalize separators
+            default_minute["key_decisions"] = normalize_text_separators(
+                ";".join(decision_sentences[:3])
+            )
 
     if not default_minute["action_items"]:
         # Look for action-related keywords
@@ -178,7 +181,10 @@ def generate_minutes_from_text(text, meeting_title, meeting_datetime=None):
                 action_sentences.append(sentence.strip())
 
         if action_sentences:
-            default_minute["action_items"] = ";".join(action_sentences[:3])
+            # Use the text utility to normalize separators
+            default_minute["action_items"] = normalize_text_separators(
+                ";".join(action_sentences[:3])
+            )
 
     # Ensure all required fields have values
     default_minute["summary"] = (

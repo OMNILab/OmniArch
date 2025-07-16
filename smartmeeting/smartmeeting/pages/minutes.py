@@ -11,6 +11,7 @@ from smartmeeting.tools import (
     generate_minutes_from_text,
     transcribe_file,
     extract_transcription_text,
+    extract_list_from_text,
 )
 
 
@@ -22,32 +23,26 @@ class MinutesPage:
         self.auth_manager = auth_manager
         self.ui = ui_components
 
-    def _find_existing_minutes(self, meeting_id):
+    def _find_existing_minutes(self, booking_id):
         """Find existing minutes for a meeting"""
         minutes_df = self.data_manager.get_dataframe("minutes")
-        if "meeting_id" in minutes_df.columns:
-            existing_minutes = minutes_df[minutes_df["meeting_id"] == meeting_id]
-        elif "booking_id" in minutes_df.columns:
-            existing_minutes = minutes_df[minutes_df["booking_id"] == meeting_id]
+        if "booking_id" in minutes_df.columns:
+            existing_minutes = minutes_df[minutes_df["booking_id"] == booking_id]
         else:
             existing_minutes = pd.DataFrame()
 
         return existing_minutes.iloc[0] if len(existing_minutes) > 0 else None
 
-    def _update_existing_minutes(self, meeting_id, new_minutes_data):
+    def _update_existing_minutes(self, booking_id, new_minutes_data):
         """Update existing minutes for a meeting"""
         minutes_data = self.data_manager.get_data()
         minutes_list = minutes_data["minutes"]
 
         for i, minute in enumerate(minutes_list):
-            if (
-                minute.get("meeting_id") == meeting_id
-                or minute.get("booking_id") == meeting_id
-            ):
+            if minute.get("booking_id") == booking_id:
                 # Update the existing minutes
                 minutes_list[i].update(new_minutes_data)
                 minutes_list[i]["updated_datetime"] = datetime.now()
-                minutes_list[i]["updated_at"] = minutes_list[i]["updated_datetime"]
                 return True
 
         return False
@@ -109,7 +104,7 @@ class MinutesPage:
             # Select existing meeting for minutes
             meetings_df = self.data_manager.get_dataframe("meetings")
 
-            # Fix column name mapping - use correct column names from CSV
+            # Use correct column names from CSV
             title_col = (
                 "meeting_title" if "meeting_title" in meetings_df.columns else "title"
             )
@@ -123,14 +118,15 @@ class MinutesPage:
             meeting_status_info = []  # 存储会议状态信息
 
             # 按开始时间逆序排序
-            meetings_df_sorted = meetings_df.sort_values(time_col, ascending=False)
+            if time_col in meetings_df.columns:
+                meetings_df_sorted = meetings_df.sort_values(time_col, ascending=False)
+            else:
+                meetings_df_sorted = meetings_df
 
             for _, row in meetings_df_sorted.iterrows():
                 title = row.get(title_col, "未命名会议")
                 start_time = row.get(time_col, "未知时间")
-                meeting_status = row.get(
-                    "meeting_status", "upcoming"
-                )  # 获取会议执行状态
+                meeting_status = row.get("meeting_status", "upcoming")
 
                 # Format datetime if it's a datetime object
                 if pd.notna(start_time):
@@ -161,7 +157,9 @@ class MinutesPage:
             if len(meeting_options) > 0:
                 selected_meeting_option = st.selectbox("选择会议", meeting_options)
                 selected_index = meeting_options.index(selected_meeting_option)
-                selected_meeting_id = meetings_df_sorted.iloc[selected_index]["id"]
+                selected_meeting_id = meetings_df_sorted.iloc[selected_index][
+                    "booking_id"
+                ]
                 selected_meeting_title = meetings_df_sorted.iloc[selected_index][
                     title_col
                 ]
@@ -173,7 +171,7 @@ class MinutesPage:
                 elif selected_meeting_status == "ongoing":
                     st.info("🔄 该会议正在进行中，可以实时生成纪要")
                 else:
-                    st.success("✅ 该会议已完成，可以生成完整纪要")
+                    pass
             else:
                 st.warning("暂无会议记录")
                 selected_meeting_id = None
@@ -272,10 +270,7 @@ class MinutesPage:
                                     ):
                                         st.success("会议纪要已更新！")
                                     else:
-                                        # If no existing minutes found, add new one with meeting_id
-                                        generated_minute["meeting_id"] = (
-                                            selected_meeting_id
-                                        )
+                                        # If no existing minutes found, add new one with booking_id
                                         generated_minute["booking_id"] = (
                                             selected_meeting_id
                                         )
@@ -297,9 +292,7 @@ class MinutesPage:
 
         with tab2:
             st.markdown("**选择音频文件**")
-            st.markdown(
-                "从预设的音频文件中选择，系统将自动转写语音内容并生成会议纪要。"
-            )
+            st.markdown("选择的音频文件，系统将自动转写语音内容并生成会议纪要。")
 
             # Audio file selection dropdown
             audio_files = {
@@ -440,10 +433,7 @@ class MinutesPage:
                                                 ):
                                                     st.success("会议纪要已更新！")
                                                 else:
-                                                    # If no existing minutes found, add new one with meeting_id
-                                                    generated_minute["meeting_id"] = (
-                                                        selected_meeting_id
-                                                    )
+                                                    # If no existing minutes found, add new one with booking_id
                                                     generated_minute["booking_id"] = (
                                                         selected_meeting_id
                                                     )
@@ -642,22 +632,13 @@ class MinutesPage:
                             st.write(minute.get("summary", "(无摘要)"))
 
                             # 显示与会人信息
-                            attendees = minute.get("attendees", "")
-                            if attendees:
+                            attendees = extract_list_from_text(
+                                minute.get("attendees", ""), default_value="未识别"
+                            )
+                            if attendees and attendees != ["未识别"]:
                                 st.markdown("#### 与会人员")
-                                if isinstance(attendees, str):
-                                    # 如果是字符串，按分号分割
-                                    attendee_list = [
-                                        a.strip()
-                                        for a in attendees.split(";")
-                                        if a.strip()
-                                    ]
-                                    for attendee in attendee_list:
-                                        st.markdown(f"• {attendee}")
-                                elif isinstance(attendees, list):
-                                    # 如果是列表，直接显示
-                                    for attendee in attendees:
-                                        st.markdown(f"• {attendee}")
+                                for attendee in attendees:
+                                    st.markdown(f"• {attendee}")
 
                             # 显示会议纪要全文（默认收起）
                             original_text = minute.get("original_text", "")
@@ -672,14 +653,22 @@ class MinutesPage:
                                     )
 
                         with col2:
-                            decisions = minute.get("decisions", [])
-                            if decisions:
+                            # Use the text utility to extract and display decisions
+                            decisions = extract_list_from_text(
+                                minute.get("key_decisions")
+                                or minute.get("decisions", ""),
+                                default_value="无",
+                            )
+                            if decisions and decisions != ["无"]:
                                 st.markdown("#### 决策事项")
                                 for i, decision in enumerate(decisions, 1):
                                     st.markdown(f"{i}. {decision}")
 
-                            action_items = minute.get("action_items", [])
-                            if action_items:
+                            # Use the text utility to extract and display action items
+                            action_items = extract_list_from_text(
+                                minute.get("action_items", ""), default_value="无"
+                            )
+                            if action_items and action_items != ["无"]:
                                 st.markdown("#### 行动项")
                                 for i, action in enumerate(action_items, 1):
                                     st.markdown(f"{i}. {action}")
@@ -715,8 +704,59 @@ class MinutesPage:
                                     st.error("无法更新纪要状态：ID无效")
 
                         with bcol3:
-                            if st.button("删除", key=f"delete_{minute_id}_{idx}"):
-                                st.warning("删除功能暂未实现")
+                            # Check if this minute is in delete confirmation state
+                            delete_key = f"delete_confirm_{minute_id}_{idx}"
+                            if (
+                                delete_key in st.session_state
+                                and st.session_state[delete_key]
+                            ):
+                                # Show confirmation dialog
+                                st.warning("⚠️ 您即将删除此会议纪要，此操作不可恢复！")
+
+                                col_a, col_b = st.columns(2)
+                                with col_a:
+                                    if st.button(
+                                        "✅ 确认删除",
+                                        key=f"confirm_delete_{minute_id}_{idx}",
+                                        type="primary",
+                                    ):
+                                        actual_id = minute.get("id") or minute.get(
+                                            "minute_id"
+                                        )
+                                        if actual_id and pd.notna(actual_id):
+                                            deleted_minute = (
+                                                self.data_manager.delete_minute(
+                                                    actual_id
+                                                )
+                                            )
+                                            if deleted_minute:
+                                                st.success("✅ 会议纪要已删除")
+                                                # Clear the delete confirmation state
+                                                if delete_key in st.session_state:
+                                                    del st.session_state[delete_key]
+                                                st.rerun()
+                                            else:
+                                                st.error(
+                                                    "❌ 删除失败：未找到指定的会议纪要"
+                                                )
+                                        else:
+                                            st.error("无法删除纪要：ID无效")
+
+                                with col_b:
+                                    if st.button(
+                                        "❌ 取消",
+                                        key=f"cancel_delete_{minute_id}_{idx}",
+                                    ):
+                                        # Clear the delete confirmation state
+                                        if delete_key in st.session_state:
+                                            del st.session_state[delete_key]
+                                        st.rerun()
+                            else:
+                                # Show delete button
+                                if st.button("删除", key=f"delete_{minute_id}_{idx}"):
+                                    # Set the delete confirmation state
+                                    st.session_state[delete_key] = True
+                                    st.rerun()
             else:
                 st.info("没有找到符合条件的会议纪要")
         else:

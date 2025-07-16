@@ -88,19 +88,15 @@ class DashboardPage:
             if ongoing_meetings:
                 st.markdown("#### 🔄 正在进行的会议")
                 for meeting in ongoing_meetings:
-                    title = meeting.get("meeting_title") or meeting.get(
-                        "title", "未命名会议"
-                    )
-                    start_time = meeting.get("start_datetime") or meeting.get(
-                        "start_time", "未知时间"
-                    )
+                    title = meeting.get("meeting_title", "未命名会议")
+                    start_time = meeting.get("start_datetime", "未知时间")
                     room_id = meeting.get("room_id", "未知")
 
                     # 获取房间名称
                     rooms_df = self.data_manager.get_dataframe("rooms")
-                    room_info = rooms_df[rooms_df["id"] == room_id]
+                    room_info = rooms_df[rooms_df["room_id"] == room_id]
                     room_name = (
-                        room_info.iloc[0]["name"]
+                        room_info.iloc[0]["room_name"]
                         if not room_info.empty
                         else f"会议室{room_id}"
                     )
@@ -111,19 +107,15 @@ class DashboardPage:
             if upcoming_meetings:
                 st.markdown("#### 🕐 即将到来的会议")
                 for meeting in upcoming_meetings:
-                    title = meeting.get("meeting_title") or meeting.get(
-                        "title", "未命名会议"
-                    )
-                    start_time = meeting.get("start_datetime") or meeting.get(
-                        "start_time", "未知时间"
-                    )
+                    title = meeting.get("meeting_title", "未命名会议")
+                    start_time = meeting.get("start_datetime", "未知时间")
                     room_id = meeting.get("room_id", "未知")
 
                     # 获取房间名称
                     rooms_df = self.data_manager.get_dataframe("rooms")
-                    room_info = rooms_df[rooms_df["id"] == room_id]
+                    room_info = rooms_df[rooms_df["room_id"] == room_id]
                     room_name = (
-                        room_info.iloc[0]["name"]
+                        room_info.iloc[0]["room_name"]
                         if not room_info.empty
                         else f"会议室{room_id}"
                     )
@@ -174,15 +166,17 @@ class DashboardPage:
                     .reset_index(name="usage_count")
                 )
                 room_usage = room_usage.merge(
-                    rooms_df[["id", "name"]], left_on="room_id", right_on="id"
+                    rooms_df[["room_id", "room_name"]],
+                    left_on="room_id",
+                    right_on="room_id",
                 )
 
                 fig = px.bar(
                     room_usage,
-                    x="name",
+                    x="room_name",
                     y="usage_count",
                     title="会议室使用频率",
-                    labels={"name": "会议室", "usage_count": "使用次数"},
+                    labels={"room_name": "会议室", "usage_count": "使用次数"},
                     color="usage_count",
                     color_continuous_scale="viridis",
                 )
@@ -198,7 +192,7 @@ class DashboardPage:
                 st.info("暂无会议数据")
 
         with col2:
-            if len(meetings_df) > 0:
+            if len(meetings_df) > 0 and "duration_minutes" in meetings_df.columns:
                 duration_bins = [0, 30, 60, 90, 120, 150, 180]
                 duration_labels = [
                     "0-30min",
@@ -210,7 +204,9 @@ class DashboardPage:
                 ]
 
                 meetings_df["duration_bin"] = pd.cut(
-                    meetings_df["duration"], bins=duration_bins, labels=duration_labels
+                    meetings_df["duration_minutes"],
+                    bins=duration_bins,
+                    labels=duration_labels,
                 )
                 duration_dist = meetings_df["duration_bin"].value_counts().sort_index()
 
@@ -237,13 +233,26 @@ class DashboardPage:
         # Real department data analysis
         users_df = self.data_manager.get_dataframe("users")
         tasks_df = self.data_manager.get_dataframe("tasks")
+        departments_df = self.data_manager.get_dataframe("departments")
 
-        if len(users_df) > 0 and len(tasks_df) > 0:
+        if len(users_df) > 0 and len(tasks_df) > 0 and len(departments_df) > 0:
+            # Join tasks with departments to get department names
             dept_usage = (
-                tasks_df.groupby("department")
-                .agg({"id": "count", "status": lambda x: (x == "完成").sum()})
+                tasks_df.groupby("department_id")
+                .agg({"task_id": "count", "status": lambda x: (x == "完成").sum()})
                 .reset_index()
             )
+            dept_usage.columns = ["department_id", "total_tasks", "completed_tasks"]
+
+            # Join with departments to get department names
+            dept_usage = dept_usage.merge(
+                departments_df[["department_id", "department_name"]],
+                left_on="department_id",
+                right_on="department_id",
+            )
+            dept_usage = dept_usage[
+                ["department_name", "total_tasks", "completed_tasks"]
+            ]
             dept_usage.columns = ["department", "total_tasks", "completed_tasks"]
 
             col1, col2 = st.columns(2)

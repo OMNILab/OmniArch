@@ -143,9 +143,9 @@ class CalendarPage:
                     color_index += 1
 
                 room_name = room_name_map.get(room_id, f"房间{room_id}")
-                title = booking.get("meeting_title", booking.get("title", "未知会议"))
-                start_time = booking.get("start_datetime", booking.get("start_time"))
-                end_time = booking.get("end_datetime", booking.get("end_time"))
+                title = booking.get("meeting_title", "未知会议")
+                start_time = booking.get("start_datetime")
+                end_time = booking.get("end_datetime")
 
                 # 确保时间格式正确
                 if pd.notna(start_time) and pd.notna(end_time):

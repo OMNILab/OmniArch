@@ -68,67 +68,122 @@ class DataManager:
 
             # Load users data
             users_df = pd.read_csv(os.path.join(self.csv_path, "users.csv"))
+            # Join with departments to get department names
+            if "department_id" in users_df.columns:
+                users_df = users_df.merge(
+                    departments_df[["department_id", "department_name"]],
+                    on="department_id",
+                    how="left",
+                )
+                users_df = users_df.rename(columns={"department_name": "department"})
+            # Convert datetime columns
+            if "created_date" in users_df.columns:
+                users_df["created_date"] = pd.to_datetime(
+                    users_df["created_date"], errors="coerce"
+                )
+            if "last_login" in users_df.columns:
+                users_df["last_login"] = pd.to_datetime(
+                    users_df["last_login"], errors="coerce"
+                )
             st.session_state.mock_data["users"] = users_df.to_dict("records")
 
             # Load bookings data
             bookings_df = pd.read_csv(os.path.join(self.csv_path, "bookings.csv"))
             # Convert datetime columns
-            bookings_df["start_datetime"] = pd.to_datetime(
-                bookings_df["start_datetime"]
-            )
-            bookings_df["end_datetime"] = pd.to_datetime(bookings_df["end_datetime"])
-            bookings_df["created_datetime"] = pd.to_datetime(
-                bookings_df["created_datetime"]
-            )
+            if "start_datetime" in bookings_df.columns:
+                bookings_df["start_datetime"] = pd.to_datetime(
+                    bookings_df["start_datetime"], errors="coerce"
+                )
+            if "end_datetime" in bookings_df.columns:
+                bookings_df["end_datetime"] = pd.to_datetime(
+                    bookings_df["end_datetime"], errors="coerce"
+                )
+            if "created_datetime" in bookings_df.columns:
+                bookings_df["created_datetime"] = pd.to_datetime(
+                    bookings_df["created_datetime"], errors="coerce"
+                )
             st.session_state.mock_data["meetings"] = bookings_df.to_dict("records")
 
             # Load meeting minutes data
             minutes_df = pd.read_csv(os.path.join(self.csv_path, "meeting_minutes.csv"))
-            minutes_df["created_datetime"] = pd.to_datetime(
-                minutes_df["created_datetime"]
-            )
-            minutes_df["updated_datetime"] = pd.to_datetime(
-                minutes_df["updated_datetime"]
-            )
-
-            # Apply field mapping to CSV data before storing in session state
-            if (
-                "meeting_title" in minutes_df.columns
-                and "title" not in minutes_df.columns
-            ):
-                minutes_df["title"] = minutes_df["meeting_title"]
-            if "minute_id" in minutes_df.columns and "id" not in minutes_df.columns:
-                minutes_df["id"] = minutes_df["minute_id"]
-
+            if "created_datetime" in minutes_df.columns:
+                minutes_df["created_datetime"] = pd.to_datetime(
+                    minutes_df["created_datetime"], errors="coerce"
+                )
+            if "updated_datetime" in minutes_df.columns:
+                minutes_df["updated_datetime"] = pd.to_datetime(
+                    minutes_df["updated_datetime"], errors="coerce"
+                )
             st.session_state.mock_data["minutes"] = minutes_df.to_dict("records")
 
             # Load tasks data
             tasks_df = pd.read_csv(os.path.join(self.csv_path, "tasks.csv"))
-            tasks_df["deadline"] = pd.to_datetime(tasks_df["deadline"])
-            tasks_df["created_datetime"] = pd.to_datetime(tasks_df["created_datetime"])
-            tasks_df["updated_datetime"] = pd.to_datetime(tasks_df["updated_datetime"])
+            # Join with departments to get department names
+            if "department_id" in tasks_df.columns:
+                tasks_df = tasks_df.merge(
+                    departments_df[["department_id", "department_name"]],
+                    on="department_id",
+                    how="left",
+                )
+                tasks_df = tasks_df.rename(columns={"department_name": "department"})
+            if "deadline" in tasks_df.columns:
+                tasks_df["deadline"] = pd.to_datetime(
+                    tasks_df["deadline"], errors="coerce"
+                )
+            if "created_datetime" in tasks_df.columns:
+                tasks_df["created_datetime"] = pd.to_datetime(
+                    tasks_df["created_datetime"], errors="coerce"
+                )
+            if "updated_datetime" in tasks_df.columns:
+                tasks_df["updated_datetime"] = pd.to_datetime(
+                    tasks_df["updated_datetime"], errors="coerce"
+                )
             st.session_state.mock_data["tasks"] = tasks_df.to_dict("records")
 
             # Load booking statistics data
             statistics_df = pd.read_csv(
                 os.path.join(self.csv_path, "booking_statistics.csv")
             )
-            statistics_df["created_date"] = pd.to_datetime(
-                statistics_df["created_date"]
-            )
+            # Join with departments to get department names for department statistics
+            if "department_id" in statistics_df.columns:
+                # Filter out empty department_id values for joining
+                dept_stats_df = statistics_df[
+                    statistics_df["department_id"].notna()
+                    & (statistics_df["department_id"] != "")
+                ]
+                if len(dept_stats_df) > 0:
+                    dept_stats_df = dept_stats_df.merge(
+                        departments_df[["department_id", "department_name"]],
+                        on="department_id",
+                        how="left",
+                    )
+                    dept_stats_df = dept_stats_df.rename(
+                        columns={"department_name": "department"}
+                    )
+                    # Update the original dataframe with department names
+                    statistics_df = statistics_df.merge(
+                        dept_stats_df[["stat_id", "department"]],
+                        on="stat_id",
+                        how="left",
+                    )
+            if "created_date" in statistics_df.columns:
+                statistics_df["created_date"] = pd.to_datetime(
+                    statistics_df["created_date"], errors="coerce"
+                )
             st.session_state.mock_data["statistics"] = statistics_df.to_dict("records")
 
             # Load user requirements data
             requirements_df = pd.read_csv(
                 os.path.join(self.csv_path, "user_requirements.csv")
             )
-            requirements_df["created_datetime"] = pd.to_datetime(
-                requirements_df["created_datetime"]
-            )
-            # Handle nullable datetime columns
-            requirements_df["parsed_datetime"] = pd.to_datetime(
-                requirements_df["parsed_datetime"], errors="coerce"
-            )
+            if "created_datetime" in requirements_df.columns:
+                requirements_df["created_datetime"] = pd.to_datetime(
+                    requirements_df["created_datetime"], errors="coerce"
+                )
+            if "parsed_datetime" in requirements_df.columns:
+                requirements_df["parsed_datetime"] = pd.to_datetime(
+                    requirements_df["parsed_datetime"], errors="coerce"
+                )
             st.session_state.mock_data["requirements"] = requirements_df.to_dict(
                 "records"
             )
@@ -141,214 +196,98 @@ class DataManager:
         return st.session_state.mock_data
 
     def get_dataframe(self, data_type):
-        """Get specific data as pandas DataFrame from session state with CSV compatibility"""
+        """Get specific data as pandas DataFrame from session state"""
         if data_type in st.session_state.mock_data:
             df = pd.DataFrame(st.session_state.mock_data[data_type])
-
-            # Convert datetime columns for consistency
-            if data_type == "meetings":
-                datetime_cols = ["start_datetime", "end_datetime", "created_datetime"]
-                for col in datetime_cols:
-                    if col in df.columns:
-                        df[col] = pd.to_datetime(df[col], errors="coerce")
-
-                # Ensure legacy column names exist
-                if "start_datetime" in df.columns and "start_time" not in df.columns:
-                    df["start_time"] = df["start_datetime"]
-                if "end_datetime" in df.columns and "end_time" not in df.columns:
-                    df["end_time"] = df["end_datetime"]
-                if "duration_minutes" in df.columns and "duration" not in df.columns:
-                    df["duration"] = df["duration_minutes"]
-                if (
-                    "participant_count" in df.columns
-                    and "participants" not in df.columns
-                ):
-                    df["participants"] = df["participant_count"]
-                if "meeting_title" in df.columns and "title" not in df.columns:
-                    df["title"] = df["meeting_title"]
-                if "booking_id" in df.columns and "id" not in df.columns:
-                    df["id"] = df["booking_id"]
-                if "meeting_type" in df.columns and "type" not in df.columns:
-                    df["type"] = df["meeting_type"]
-
-            elif data_type == "tasks":
-                datetime_cols = ["deadline", "created_datetime", "updated_datetime"]
-                for col in datetime_cols:
-                    if col in df.columns:
-                        df[col] = pd.to_datetime(df[col], errors="coerce")
-
-                # Ensure legacy column names exist
-                if "created_datetime" in df.columns and "created_at" not in df.columns:
-                    df["created_at"] = df["created_datetime"]
-                if "department_id" in df.columns and "department" not in df.columns:
-                    # Map department_id to department name
-                    dept_mapping = {
-                        1: "研发部",
-                        2: "测试部",
-                        3: "架构部",
-                        4: "产品部",
-                        5: "运营部",
-                        6: "设计部",
-                        7: "市场部",
-                        8: "销售部",
-                        9: "人事部",
-                        10: "财务部",
-                    }
-                    df["department"] = df["department_id"].map(dept_mapping)
-                if "task_id" in df.columns and "id" not in df.columns:
-                    df["id"] = df["task_id"]
-
-            elif data_type == "minutes":
-                datetime_cols = ["created_datetime", "updated_datetime"]
-                for col in datetime_cols:
-                    if col in df.columns:
-                        df[col] = pd.to_datetime(df[col], errors="coerce")
-
-                # Ensure legacy column names exist
-                if "created_datetime" in df.columns and "created_at" not in df.columns:
-                    df["created_at"] = df["created_datetime"]
-                if "updated_datetime" in df.columns and "updated_at" not in df.columns:
-                    df["updated_at"] = df["updated_datetime"]
-                if "minute_id" in df.columns and "id" not in df.columns:
-                    df["id"] = df["minute_id"]
-                if "booking_id" in df.columns and "meeting_id" not in df.columns:
-                    df["meeting_id"] = df["booking_id"]
-                if "meeting_title" in df.columns and "title" not in df.columns:
-                    df["title"] = df["meeting_title"]
-
-                # Helper function to split by multiple delimiters
-                def split_by_delimiters(text):
-                    if not isinstance(text, str):
-                        return text
-                    # Split by Chinese semicolon (；), English semicolon (;), Chinese period (。), English period (.)
-                    import re
-
-                    return re.split(r"[；;。.]", text)
-
-                if "key_decisions" in df.columns and "decisions" not in df.columns:
-                    df["decisions"] = df["key_decisions"].apply(split_by_delimiters)
-                # Ensure action_items is a list (split by multiple delimiters if string)
-                if "action_items" in df.columns:
-                    df["action_items"] = df["action_items"].apply(split_by_delimiters)
-
-            elif data_type == "users":
-                datetime_cols = ["created_date", "last_login"]
-                for col in datetime_cols:
-                    if col in df.columns:
-                        df[col] = pd.to_datetime(df[col], errors="coerce")
-
-                # Ensure legacy column names exist
-                if "created_date" in df.columns and "created_at" not in df.columns:
-                    df["created_at"] = df["created_date"]
-                if "user_id" in df.columns and "id" not in df.columns:
-                    df["id"] = df["user_id"]
-                if "department_id" in df.columns and "department" not in df.columns:
-                    # Map department_id to department name
-                    dept_mapping = {
-                        1: "研发部",
-                        2: "测试部",
-                        3: "架构部",
-                        4: "产品部",
-                        5: "运营部",
-                        6: "设计部",
-                        7: "市场部",
-                        8: "销售部",
-                        9: "人事部",
-                        10: "财务部",
-                    }
-                    df["department"] = df["department_id"].map(dept_mapping)
-
-            elif data_type == "rooms":
-                # Ensure legacy column names exist
-                if "room_id" in df.columns and "id" not in df.columns:
-                    df["id"] = df["room_id"]
-                if "room_name" in df.columns and "name" not in df.columns:
-                    df["name"] = df["room_name"]
-                if "room_type" in df.columns and "type" not in df.columns:
-                    df["type"] = df["room_type"]
-                if "equipment_notes" in df.columns and "equipment" not in df.columns:
-                    df["equipment"] = df["equipment_notes"]
-
             return df
         return pd.DataFrame()
 
     def add_meeting(self, meeting_data):
         """Add a new meeting to session state"""
-        meeting_data["id"] = len(st.session_state.mock_data["meetings"]) + 1
-        meeting_data["booking_id"] = meeting_data["id"]
-        meeting_data["created_at"] = datetime.now()
+        meeting_data["booking_id"] = len(st.session_state.mock_data["meetings"]) + 1
+        meeting_data["created_datetime"] = datetime.now()
         st.session_state.mock_data["meetings"].append(meeting_data)
 
     def add_task(self, task_data):
         """Add a new task to session state"""
-        task_data["id"] = len(st.session_state.mock_data["tasks"]) + 1
-        task_data["task_id"] = task_data["id"]
-        task_data["created_at"] = datetime.now()
+        task_data["task_id"] = len(st.session_state.mock_data["tasks"]) + 1
+        task_data["created_datetime"] = datetime.now()
         st.session_state.mock_data["tasks"].append(task_data)
 
     def add_minute(self, minute_data):
         """Add a new minute to session state"""
-        minute_data["id"] = len(st.session_state.mock_data["minutes"]) + 1
-        minute_data["minute_id"] = minute_data["id"]
-        minute_data["created_at"] = datetime.now()
-        minute_data["updated_at"] = datetime.now()
-        minute_data["created_datetime"] = minute_data["created_at"]
-        minute_data["updated_datetime"] = minute_data["updated_at"]
+        # Use minute_id to match CSV structure
+        minute_data["minute_id"] = len(st.session_state.mock_data["minutes"]) + 1
+        minute_data["created_datetime"] = datetime.now()
+        minute_data["updated_datetime"] = datetime.now()
         st.session_state.mock_data["minutes"].append(minute_data)
 
     def update_task_status(self, task_id, new_status):
         """Update task status in session state"""
         for task in st.session_state.mock_data["tasks"]:
-            if task.get("id") == task_id or task.get("task_id") == task_id:
+            if task.get("task_id") == task_id:
                 task["status"] = new_status
-                task["updated_at"] = datetime.now()
+                task["updated_datetime"] = datetime.now()
                 break
 
     def update_meeting_status(self, meeting_id, new_status):
         """Update meeting status in session state"""
         for meeting in st.session_state.mock_data["meetings"]:
-            if meeting["id"] == meeting_id:
-                meeting["status"] = new_status
-                meeting["updated_at"] = datetime.now()
+            if meeting["booking_id"] == meeting_id:
+                meeting["meeting_status"] = new_status
+                meeting["updated_datetime"] = datetime.now()
                 break
 
     def update_minute_status(self, minute_id, new_status):
         """Update minute status in session state"""
         for minute in st.session_state.mock_data["minutes"]:
-            if minute["id"] == minute_id:
+            # Check both 'id' and 'minute_id' fields for compatibility
+            minute_identifier = minute.get("minute_id")
+            if minute_identifier == minute_id:
                 minute["status"] = new_status
-                minute["updated_at"] = datetime.now()
+                minute["updated_datetime"] = datetime.now()
                 break
+
+    def delete_minute(self, minute_id):
+        """Delete a minute from session state"""
+        for i, minute in enumerate(st.session_state.mock_data["minutes"]):
+            # Check both 'id' and 'minute_id' fields for compatibility
+            minute_identifier = minute.get("minute_id")
+            if minute_identifier == minute_id:
+                deleted_minute = st.session_state.mock_data["minutes"].pop(i)
+                return deleted_minute
+        return None
 
     def get_meeting_by_id(self, meeting_id):
         """Get meeting by ID from session state"""
         for meeting in st.session_state.mock_data["meetings"]:
-            if meeting["id"] == meeting_id:
+            if meeting["booking_id"] == meeting_id:
                 return meeting
         return None
 
     def get_task_by_id(self, task_id):
         """Get task by ID from session state"""
         for task in st.session_state.mock_data["tasks"]:
-            if task["id"] == task_id:
+            if task["task_id"] == task_id:
                 return task
         return None
 
     def get_minute_by_id(self, minute_id):
         """Get minute by ID from session state"""
         for minute in st.session_state.mock_data["minutes"]:
-            if minute["id"] == minute_id:
+            # Check both 'id' and 'minute_id' fields for compatibility
+            minute_identifier = minute.get("minute_id")
+            if minute_identifier == minute_id:
                 return minute
         return None
 
     def reset_to_default(self):
         """Reset all data to default mock state"""
         st.session_state.mock_data = {}
-        # Try to load from CSV first, fall back to generated data
         if self._csv_files_exist():
             self._load_from_csv()
         else:
-            self._generate_mock_data()
+            raise FileNotFoundError("CSV files not found")
         st.success("数据已重置为默认状态")
 
     def get_dashboard_data(self):
@@ -366,17 +305,23 @@ class DataManager:
             "meetings_today": (
                 len(
                     meetings_df[
-                        pd.to_datetime(meetings_df["start_time"]).dt.date
+                        pd.to_datetime(meetings_df["start_datetime"]).dt.date
                         == datetime.now().date()
                     ]
                 )
-                if len(meetings_df) > 0
+                if len(meetings_df) > 0 and "start_datetime" in meetings_df.columns
                 else 0
             ),
-            "completed_tasks": len(tasks_df[tasks_df["status"] == "完成"]),
-            "available_rooms": len(rooms_df[rooms_df["status"] == "可用"]),
+            "completed_tasks": (
+                len(tasks_df[tasks_df["status"] == "完成"]) if len(tasks_df) > 0 else 0
+            ),
+            "available_rooms": (
+                len(rooms_df[rooms_df["status"] == "可用"]) if len(rooms_df) > 0 else 0
+            ),
             "avg_meeting_duration": (
-                meetings_df["duration"].mean() if len(meetings_df) > 0 else 0
+                meetings_df["duration_minutes"].mean()
+                if len(meetings_df) > 0 and "duration_minutes" in meetings_df.columns
+                else 0
             ),
         }
 
@@ -393,28 +338,31 @@ class DataManager:
 
         # Filter by equipment if specified
         if equipment_needed:
-            if "投影仪" in equipment_needed:
-                suitable_rooms = suitable_rooms[
-                    suitable_rooms.get("has_projector", 0) == 1
-                ]
-            if "视频会议设备" in equipment_needed:
-                suitable_rooms = suitable_rooms[suitable_rooms.get("has_phone", 0) == 1]
-            if "白板" in equipment_needed:
-                suitable_rooms = suitable_rooms[
-                    suitable_rooms.get("has_whiteboard", 0) == 1
-                ]
-            if "显示屏" in equipment_needed:
-                suitable_rooms = suitable_rooms[
-                    suitable_rooms.get("has_screen", 0) == 1
-                ]
+            if (
+                "投影仪" in equipment_needed
+                and "has_projector" in suitable_rooms.columns
+            ):
+                suitable_rooms = suitable_rooms[suitable_rooms["has_projector"] == 1]
+            if (
+                "视频会议设备" in equipment_needed
+                and "has_phone" in suitable_rooms.columns
+            ):
+                suitable_rooms = suitable_rooms[suitable_rooms["has_phone"] == 1]
+            if (
+                "白板" in equipment_needed
+                and "has_whiteboard" in suitable_rooms.columns
+            ):
+                suitable_rooms = suitable_rooms[suitable_rooms["has_whiteboard"] == 1]
+            if "显示屏" in equipment_needed and "has_screen" in suitable_rooms.columns:
+                suitable_rooms = suitable_rooms[suitable_rooms["has_screen"] == 1]
 
         # Filter by location if specified
-        if location_preference:
+        if location_preference and "building_id" in suitable_rooms.columns:
             suitable_rooms = suitable_rooms[
-                suitable_rooms.get("building_id", 0) == location_preference
+                suitable_rooms["building_id"] == location_preference
             ]
 
-        return suitable_rooms.to_dict("records")
+        return suitable_rooms.to_dict("records") if len(suitable_rooms) > 0 else []
 
     def get_booking_statistics(self, stat_type=None, period=None):
         """Get booking statistics"""
@@ -451,12 +399,8 @@ class DataManager:
         current_time = datetime.now()
 
         for meeting in st.session_state.mock_data["meetings"]:
-            start_time = pd.to_datetime(
-                meeting.get("start_datetime") or meeting.get("start_time")
-            )
-            end_time = pd.to_datetime(
-                meeting.get("end_datetime") or meeting.get("end_time")
-            )
+            start_time = pd.to_datetime(meeting.get("start_datetime"), errors="coerce")
+            end_time = pd.to_datetime(meeting.get("end_datetime"), errors="coerce")
 
             if pd.notna(start_time) and pd.notna(end_time):
                 if current_time < start_time:
@@ -471,36 +415,55 @@ class DataManager:
         self.update_meeting_statuses()
         meetings_df = self.get_dataframe("meetings")
 
+        if len(meetings_df) == 0:
+            return []
+
         # 筛选即将到来的会议
         upcoming_meetings = meetings_df[meetings_df["meeting_status"] == "upcoming"]
 
         # 按开始时间排序
-        if len(upcoming_meetings) > 0:
+        if len(upcoming_meetings) > 0 and "start_datetime" in upcoming_meetings.columns:
             upcoming_meetings = upcoming_meetings.sort_values("start_datetime")
 
-        return upcoming_meetings.head(limit).to_dict("records")
+        return (
+            upcoming_meetings.head(limit).to_dict("records")
+            if len(upcoming_meetings) > 0
+            else []
+        )
 
     def get_ongoing_meetings(self):
         """获取正在进行的会议列表"""
         self.update_meeting_statuses()
         meetings_df = self.get_dataframe("meetings")
 
-        return meetings_df[meetings_df["meeting_status"] == "ongoing"].to_dict(
-            "records"
-        )
+        if len(meetings_df) == 0:
+            return []
+
+        ongoing_meetings = meetings_df[meetings_df["meeting_status"] == "ongoing"]
+        return ongoing_meetings.to_dict("records") if len(ongoing_meetings) > 0 else []
 
     def get_completed_meetings(self, limit=10):
         """获取已完成的会议列表"""
         self.update_meeting_statuses()
         meetings_df = self.get_dataframe("meetings")
 
+        if len(meetings_df) == 0:
+            return []
+
         # 筛选已完成的会议
         completed_meetings = meetings_df[meetings_df["meeting_status"] == "completed"]
 
         # 按开始时间倒序排序
-        if len(completed_meetings) > 0:
+        if (
+            len(completed_meetings) > 0
+            and "start_datetime" in completed_meetings.columns
+        ):
             completed_meetings = completed_meetings.sort_values(
                 "start_datetime", ascending=False
             )
 
-        return completed_meetings.head(limit).to_dict("records")
+        return (
+            completed_meetings.head(limit).to_dict("records")
+            if len(completed_meetings) > 0
+            else []
+        )

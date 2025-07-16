@@ -53,24 +53,20 @@ def main():
         current_time = pd.Timestamp.now()
 
         for meeting in upcoming_meetings:
-            start_time = pd.to_datetime(
-                meeting.get("start_datetime") or meeting.get("start_time")
-            )
+            start_time = pd.to_datetime(meeting.get("start_datetime"), errors="coerce")
             if pd.notna(start_time):
                 time_diff = start_time - current_time
                 hours_until = time_diff.total_seconds() / 3600
 
                 if 0 < hours_until <= 1:  # 1小时内
-                    title = meeting.get("meeting_title") or meeting.get(
-                        "title", "未命名会议"
-                    )
+                    title = meeting.get("meeting_title", "未命名会议")
                     room_id = meeting.get("room_id", "未知")
 
                     # 获取房间名称
                     rooms_df = data_manager.get_dataframe("rooms")
-                    room_info = rooms_df[rooms_df["id"] == room_id]
+                    room_info = rooms_df[rooms_df["room_id"] == room_id]
                     room_name = (
-                        room_info.iloc[0]["name"]
+                        room_info.iloc[0]["room_name"]
                         if not room_info.empty
                         else f"会议室{room_id}"
                     )
@@ -85,14 +81,16 @@ def main():
 
         # 检查正在进行的会议
         for meeting in ongoing_meetings:
-            title = meeting.get("meeting_title") or meeting.get("title", "未命名会议")
+            title = meeting.get("meeting_title", "未命名会议")
             room_id = meeting.get("room_id", "未知")
 
             # 获取房间名称
             rooms_df = data_manager.get_dataframe("rooms")
-            room_info = rooms_df[rooms_df["id"] == room_id]
+            room_info = rooms_df[rooms_df["room_id"] == room_id]
             room_name = (
-                room_info.iloc[0]["name"] if not room_info.empty else f"会议室{room_id}"
+                room_info.iloc[0]["room_name"]
+                if not room_info.empty
+                else f"会议室{room_id}"
             )
 
             notifications.append(

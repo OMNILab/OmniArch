@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.express as px
 from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 import json
+from datetime import datetime
 
 
 class SettingsPage:
@@ -273,13 +274,31 @@ class SettingsPage:
 
             if len(users_df) > 0:
                 # 组织架构统计卡片
-                org_data = (
-                    users_df.groupby("department")
-                    .agg({"id": "count", "name": "first"})
-                    .reset_index()
-                )
-                org_data.columns = ["部门", "人数", "示例成员"]
-                org_data["状态"] = "正常"
+                # Join with departments to get department names
+                departments_df = self.data_manager.get_dataframe("departments")
+                if len(departments_df) > 0:
+                    users_with_dept = users_df.merge(
+                        departments_df[["department_id", "department_name"]],
+                        left_on="department_id",
+                        right_on="department_id",
+                    )
+
+                    org_data = (
+                        users_with_dept.groupby("department_name")
+                        .agg({"user_id": "count", "name": "first"})
+                        .reset_index()
+                    )
+                    org_data.columns = ["部门", "人数", "示例成员"]
+                    org_data["状态"] = "正常"
+                else:
+                    # Fallback if departments data is not available
+                    org_data = (
+                        users_df.groupby("department_id")
+                        .agg({"user_id": "count", "name": "first"})
+                        .reset_index()
+                    )
+                    org_data.columns = ["部门", "人数", "示例成员"]
+                    org_data["状态"] = "正常"
 
                 # 显示统计信息
                 col1, col2, col3 = st.columns(3)
@@ -333,7 +352,28 @@ class SettingsPage:
 
                 for _, dept in org_data.iterrows():
                     with st.expander(f"📁 {dept['部门']} ({dept['人数']}人)"):
-                        dept_users = users_df[users_df["department"] == dept["部门"]]
+                        if len(departments_df) > 0:
+                            # Get department_id from department_name
+                            dept_info = departments_df[
+                                departments_df["department_name"] == dept["部门"]
+                            ]
+                            if not dept_info.empty:
+                                dept_id = dept_info.iloc[0]["department_id"]
+                                dept_users = users_df[
+                                    users_df["department_id"] == dept_id
+                                ]
+                            else:
+                                dept_users = pd.DataFrame()
+                        else:
+                            # Fallback: try to match by department_id if it's numeric
+                            try:
+                                dept_id = int(dept["部门"])
+                                dept_users = users_df[
+                                    users_df["department_id"] == dept_id
+                                ]
+                            except (ValueError, TypeError):
+                                dept_users = pd.DataFrame()
+
                         if len(dept_users) > 0:
                             # 显示部门成员
                             member_data = dept_users[["name", "role", "email"]].copy()

@@ -1258,7 +1258,7 @@ class AnalysisPage:
                         "数据源": "会议",
                         "记录ID": safe_get(meeting, "id"),
                         "标题": safe_get(meeting, "title"),
-                        "时长": float(meeting.get("duration", 0)),
+                        "时长": float(meeting.get("duration_minutes", 0)),
                         "状态": safe_get(meeting, "status"),
                         "创建时间": safe_get(meeting, "created_datetime"),
                         "会议室": safe_get(meeting, "room_id"),

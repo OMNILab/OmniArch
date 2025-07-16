@@ -136,14 +136,16 @@ def book_room(
 
         # 获取房间信息
         rooms_df = data_manager.get_dataframe("rooms")
-        room_info = rooms_df[rooms_df["id"] == room_id]
+        room_info = rooms_df[rooms_df["room_id"] == room_id]
         room_name = (
-            room_info.iloc[0]["name"] if not room_info.empty else f"会议室{room_id}"
+            room_info.iloc[0]["room_name"]
+            if not room_info.empty
+            else f"会议室{room_id}"
         )
 
         # 获取用户信息
         users_df = data_manager.get_dataframe("users")
-        user_info = users_df[users_df["id"] == user_id]
+        user_info = users_df[users_df["user_id"] == user_id]
         organizer_name = (
             user_info.iloc[0]["name"] if not user_info.empty else f"用户{user_id}"
         )

@@ -260,11 +260,11 @@ class BookingPage:
         room_id = tool_args.get("room_id")
         if room_id:
             rooms_df = self.data_manager.get_dataframe("rooms")
-            room = rooms_df[rooms_df["id"] == room_id]
+            room = rooms_df[rooms_df["room_id"] == room_id]
             if not room.empty:
                 room = room.iloc[0]
                 st.markdown(
-                    f"🏢 **会议室**: {room['name']} ({room.get('building', '未知')}-{room.get('floor', '未知')}楼)"
+                    f"🏢 **会议室**: {room['room_name']} ({room.get('building_id', '未知')}-{room.get('floor', '未知')}楼)"
                 )
                 st.markdown(f"👥 **容量**: {room['capacity']}人")
                 if room.get("equipment"):
