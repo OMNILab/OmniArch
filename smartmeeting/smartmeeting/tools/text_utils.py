@@ -13,7 +13,7 @@ def split_text_by_punctuation(text: str, remove_empty: bool = True) -> List[str]
     Split text by both English and Chinese punctuation marks.
 
     This function handles the following separators:
-    - English: semicolon (;), period (.)
+    - English: semicolon (;)
     - Chinese: semicolon (；), period (。)
 
     Args:
@@ -37,7 +37,6 @@ def split_text_by_punctuation(text: str, remove_empty: bool = True) -> List[str]
     separators = [
         ";",  # English semicolon
         "；",  # Chinese semicolon
-        ".",  # English period
         "。",  # Chinese period
     ]
 

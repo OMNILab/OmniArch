@@ -12,6 +12,10 @@ from smartmeeting.tools import (
     transcribe_file,
     extract_transcription_text,
     extract_list_from_text,
+    extract_text_from_file,
+    get_supported_file_types,
+    validate_file_size,
+    get_file_info,
 )
 from smartmeeting.tools.task_generator import (
     generate_tasks_from_action_items,
@@ -222,72 +226,117 @@ class MinutesPage:
         tab1, tab2 = st.tabs(["📄 文本文件", "🎵 音频文件"])
 
         with tab1:
-            st.markdown("**上传文本文件**")
             st.markdown(
-                "支持上传会议记录、会议笔记等文本文件，系统将自动分析并生成结构化会议纪要。"
+                "支持上传会议记录、会议笔记等文本文件，系统将自动分析并生成结构化会议纪要。支持纯文本文件 (.txt)，Markdown (.md) • Word文档 (.docx) • PDF文档 (.pdf)。最大 10MB。"
             )
+
+            # Get supported file types
+            supported_types = get_supported_file_types()
+            file_extensions = list(supported_types.keys())
 
             uploaded_text = st.file_uploader(
-                "选择文本文件", type=["txt", "docx", "pdf"], key="text_uploader"
+                "选择文件",
+                type=file_extensions,
+                key="text_uploader",
+                help="支持 TXT、Markdown、DOCX、PDF 格式",
             )
+
             if uploaded_text:
-                st.success(f"已上传: {uploaded_text.name}")
-                if st.button("生成纪要", type="primary", key="generate_from_text"):
-                    with st.spinner("正在生成会议纪要..."):
-                        try:
-                            content = uploaded_text.read().decode("utf-8")
-                            # if selected_meeting_title is empty, use first 8 chars of content
-                            meeting_title_to_use = selected_meeting_title
-                            if (
-                                not meeting_title_to_use
-                                or not meeting_title_to_use.strip()
-                            ):
-                                meeting_title_to_use = (
-                                    content[:8].strip() or "未命名纪要"
+                # Validate file size
+                if not validate_file_size(uploaded_text, max_size_mb=10):
+                    st.stop()
+
+                # Get file information
+                file_info = get_file_info(uploaded_text)
+
+                # Display file information
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.info(f"**文件名**: {file_info['name']}")
+                with col2:
+                    st.info(f"**文件类型**: {file_info['type']}")
+                with col3:
+                    st.info(f"**文件大小**: {file_info['size_mb']:.1f}MB")
+
+                # Extract text content
+                with st.spinner("正在解析文件内容..."):
+                    content = extract_text_from_file(uploaded_text)
+
+                if content:
+                    st.success(f"✅ 文件解析成功！提取到 {len(content)} 个字符")
+
+                    # Show content preview
+                    with st.expander("📄 查看文件内容预览", expanded=False):
+                        preview_length = min(500, len(content))
+                        st.text_area(
+                            "文件内容预览",
+                            value=content[:preview_length]
+                            + ("..." if len(content) > preview_length else ""),
+                            height=200,
+                            disabled=True,
+                            key="content_preview",
+                        )
+
+                    if st.button("生成纪要", type="primary", key="generate_from_text"):
+                        with st.spinner("正在生成会议纪要..."):
+                            try:
+                                # if selected_meeting_title is empty, use first 8 chars of content
+                                meeting_title_to_use = selected_meeting_title
+                                if (
+                                    not meeting_title_to_use
+                                    or not meeting_title_to_use.strip()
+                                ):
+                                    meeting_title_to_use = (
+                                        content[:8].strip() or "未命名纪要"
+                                    )
+
+                                # Generate meeting minutes using pandasai
+                                generated_minute = generate_minutes_from_text(
+                                    content,
+                                    meeting_title_to_use,
+                                    (
+                                        new_meeting_datetime
+                                        if "new_meeting_datetime" in locals()
+                                        else None
+                                    ),
                                 )
 
-                            # Generate meeting minutes using pandasai
-                            generated_minute = generate_minutes_from_text(
-                                content,
-                                meeting_title_to_use,
-                                (
-                                    new_meeting_datetime
-                                    if "new_meeting_datetime" in locals()
-                                    else None
-                                ),
-                            )
-
-                            if generated_minute:
-                                # Check if we're updating an existing meeting
-                                if (
-                                    meeting_mode == "选择已有会议"
-                                    and selected_meeting_id
-                                ):
-                                    # Try to update existing minutes
-                                    if self._update_existing_minutes(
-                                        selected_meeting_id, generated_minute
+                                if generated_minute:
+                                    # Check if we're updating an existing meeting
+                                    if (
+                                        meeting_mode == "选择已有会议"
+                                        and selected_meeting_id
                                     ):
-                                        st.success("会议纪要已更新！")
+                                        # Try to update existing minutes
+                                        if self._update_existing_minutes(
+                                            selected_meeting_id, generated_minute
+                                        ):
+                                            st.success("会议纪要已更新！")
+                                        else:
+                                            # If no existing minutes found, add new one with booking_id
+                                            generated_minute["booking_id"] = (
+                                                selected_meeting_id
+                                            )
+                                            self.data_manager.add_minute(
+                                                generated_minute
+                                            )
+                                            st.success("会议纪要生成完成并已保存！")
                                     else:
-                                        # If no existing minutes found, add new one with booking_id
-                                        generated_minute["booking_id"] = (
-                                            selected_meeting_id
-                                        )
+                                        # Add new minutes
                                         self.data_manager.add_minute(generated_minute)
                                         st.success("会议纪要生成完成并已保存！")
+
+                                    # 立即刷新 minutes_df，以便展示时不依赖过期状态
+                                    minutes_df = self.data_manager.get_dataframe(
+                                        "minutes"
+                                    )
+                                    st.rerun()
                                 else:
-                                    # Add new minutes
-                                    self.data_manager.add_minute(generated_minute)
-                                    st.success("会议纪要生成完成并已保存！")
-
-                                # 立即刷新 minutes_df，以便展示时不依赖过期状态
-                                minutes_df = self.data_manager.get_dataframe("minutes")
-                                st.rerun()
-                            else:
-                                st.error("生成会议纪要失败，请重试")
-
-                        except Exception as e:
-                            st.error(f"处理文件时出错: {str(e)}")
+                                    st.error("会议纪要生成失败，请重试")
+                            except Exception as e:
+                                st.error(f"生成会议纪要时出错: {str(e)}")
+                else:
+                    st.error("❌ 文件内容提取失败，请检查文件格式是否正确")
 
         with tab2:
             st.markdown("**选择音频文件**")

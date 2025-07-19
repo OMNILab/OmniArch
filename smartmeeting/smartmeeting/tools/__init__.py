@@ -11,6 +11,12 @@ from .text_utils import (
     extract_list_from_text,
     format_list_for_display,
 )
+from .file_processor import (
+    extract_text_from_file,
+    get_supported_file_types,
+    validate_file_size,
+    get_file_info,
+)
 from .llm import (
     setup_pandasai_llm,
     setup_chat_llm,
@@ -26,6 +32,10 @@ __all__ = [
     "normalize_text_separators",
     "extract_list_from_text",
     "format_list_for_display",
+    "extract_text_from_file",
+    "get_supported_file_types",
+    "validate_file_size",
+    "get_file_info",
     "setup_pandasai_llm",
     "setup_chat_llm",
     "create_pandasai_agent",

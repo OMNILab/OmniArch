@@ -26,7 +26,7 @@ class PandasAILLMDashScope(OpenAI):
         "qwen-plus-2025-04-28",
     ]
 
-    def __init__(self, api_token: str, model: str = "qwen-plus", **kwargs):
+    def __init__(self, api_token: str, model: str = "qwen3-30b-a3b", **kwargs):
         """
         Initialize the PandasAILLMDashScope class with DashScope's API base and Qwen model.
 

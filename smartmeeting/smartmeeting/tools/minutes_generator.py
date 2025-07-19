@@ -71,8 +71,8 @@ def generate_minutes_from_text(text, meeting_title, meeting_datetime=None):
                 f"请以JSON格式返回以下信息：\n"
                 f"{{\n"
                 f'  "summary": "会议主要内容摘要（100字以内）",\n'
-                f'  "key_decisions": "重要决策事项（用分号或句号分隔，如无决策可写\'无\'）",\n'
-                f'  "action_items": "需要执行的任务或行动项（用分号或句号分隔，如无行动项可写\'无\'）",\n'
+                f'  "key_decisions": "重要决策事项（用分号分隔，如无决策可写\'无\'）",\n'
+                f'  "action_items": "需要执行的任务或行动项（用分号分隔，如无行动项可写\'无\'）",\n'
                 f'  "attendees": "与会人员名单（用分号分隔，从文本中提取人名）",\n'
                 f'  "meeting_title": "会议标题（从文本中提取或推断）",\n'
                 f'  "duration_minutes": 60\n'
@@ -81,7 +81,8 @@ def generate_minutes_from_text(text, meeting_title, meeting_datetime=None):
                 f"1. 只返回JSON格式，不要其他内容\n"
                 f"2. 如果某项信息无法从文本中提取，使用合理的默认值\n"
                 f"3. 确保JSON格式正确，可以被解析\n"
-                f"4. 决策事项和行动项可以使用中文或英文的分号(;；)或句号(.。)分隔"
+                f"4. 决策事项和行动项可以使用分号分隔"
+                f"5. 决策事项和行动项要有意义、可执行的具体任务，不要无意义的内容"
             )
 
             # Call LLM with timeout and error handling
